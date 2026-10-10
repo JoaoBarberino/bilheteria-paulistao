@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Dados brutos do projeto: boletins em PDF ficam só em disco local.
+# As pastas data/01_raw/{ano}/ são mantidas no repositório por .gitkeep.
+data/01_raw/**/*.pdf
+data/01_raw/**/*.part
