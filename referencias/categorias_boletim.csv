@@ -1,0 +1,35 @@
+categoria_boletim,categoria,regime,rotulo_avanti
+Inteira,Inteira,mercado,
+Meia,Meia,mercado,
+Visitante - Inteira,Visitante - Inteira,mercado,
+Visitante - Meia,Visitante - Meia,mercado,
+P.C.D. - Inteira,P.C.D.,mercado,
+P.C.D.,P.C.D.,mercado,
+PCR,PCR,mercado,
+Sócio,Sócio,socio,
+Sócio - Carteirinha,Sócio - Carteirinha,socio,
+Sócio Black,Sócio,socio,
+Sócio Gold,Sócio,socio,
+Sócio Silver,Sócio,socio,
+Fiel Torcedor,Sócio,socio,
+Avanti - 20% Desconto,Avanti,socio,20% Desconto
+Avanti - 25% Desconto,Avanti,socio,25% Desconto
+Avanti - 50% Desconto,Avanti,socio,50% Desconto
+Avanti - 75% Desconto,Avanti,socio,75% Desconto
+Avanti - 100% Desconto,Avanti,socio,100% Desconto
+Carnê de Relacionamento,Carnê de Relacionamento,contrato,
+Carnê Superficiária,Carnê Superficiária,contrato,
+Carnê Cadeira Cativa - Inteira,Carnê Cadeira Cativa,contrato,
+Carnê Cadeira Cativa - Meia,Carnê Cadeira Cativa,contrato,
+Cativa - Inteira,Cativa,contrato,
+Cativa - Meia,Cativa,contrato,
+Cadeira Vitalícia,Cadeira Vitalícia,contrato,
+Proprietário Black,Proprietário,contrato,
+Proprietário Gold,Proprietário,contrato,
+Proprietário Silver,Proprietário,contrato,
+Especial - Meia,Especial,contrato,
+Especial,Especial,contrato,
+Passaporte,Passaporte,contrato,
+VENDA PROIBIDA,VENDA PROIBIDA,nao_vendido,
+Área Restrita - VENDA PROIBIDA,Área Restrita - VENDA PROIBIDA,nao_vendido,
+Carnê - Venda Proibida,Carnê - Venda Proibida,nao_vendido,
