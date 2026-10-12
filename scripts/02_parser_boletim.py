@@ -117,6 +117,9 @@ def extrair_cabecalho(linhas):
                     cab["mandante"], cab["visitante"] = cab["partida"].split(" x ", 1)
             elif t.startswith("Competição:"):
                 cab["competicao"] = t.removeprefix("Competição:").strip()
+                # Layout alternativo: "Denominação da" / valor / "Competição:".
+                if not cab["competicao"] and i >= 2 and texto(linhas[i - 2]) == "Denominação da":
+                    cab["competicao"] = texto(linhas[i - 1])
             elif re.fullmatch(r"\d+/\d{4}", t) and "boletim" not in cab:
                 cab["boletim"] = t
             elif t in ("ESTÁDIO", "CIDADE / UF"):
@@ -191,14 +194,21 @@ def separar_setor_categoria(rotulo, categorias):
 
 
 def centros_colunas(cab):
-    """Centro x de cada cabeçalho de coluna. "A VENDA" são duas palavras."""
+    """Centro x de cada cabeçalho de coluna.
+
+    Usa a posição de cada caractere, porque em alguns boletins os títulos
+    saem colados numa palavra só ("A VENDADEVOLVIDOSVENDIDOS"). Para
+    "A VENDA" usa só "VENDA"; a diferença de centro é de poucos pontos.
+    """
+    chars = [c for p in cab for c in p["chars"]]
+    linha = "".join(c["text"] for c in chars)
     centros = {}
     for nome in COLUNAS:
-        primeira = nome.split()[0]
-        ps = [p for p in cab if p["text"] == primeira]
-        p0 = ps[-1] if nome == "A VENDA" else ps[0]
-        x1 = cab[cab.index(p0) + 1]["x1"] if nome == "A VENDA" else p0["x1"]
-        centros[nome] = (p0["x0"] + x1) / 2
+        alvo = nome.split()[-1]
+        i = linha.find(alvo)
+        if i < 0:
+            raise ValueError(f"Coluna {nome} não encontrada no cabeçalho: {linha!r}")
+        centros[nome] = (chars[i]["x0"] + chars[i + len(alvo) - 1]["x1"]) / 2
     return centros
 
 
@@ -229,13 +239,15 @@ def extrair_tabela(paginas, categorias):
         for p in ps:
             if p["x1"] < x_inicio_numeros or p["text"] == "R$":
                 continue
-            if not eh_numero(p["text"]):
+            # Alguns boletins colam o símbolo no valor: "R$120,00".
+            valor = p["text"].removeprefix("R$")
+            if not eh_numero(valor):
                 raise ValueError(f"Token inesperado na área numérica: {p['text']!r} em {rotulo!r}")
             centro = (p["x0"] + p["x1"]) / 2
             col = min(centros, key=lambda c: abs(centros[c] - centro))
             if col in valores:
                 raise ValueError(f"Dois valores na coluna {col} em {rotulo!r}")
-            valores[col] = numero_br(p["text"])
+            valores[col] = numero_br(valor)
         registro = {"rotulo": rotulo, **valores}
         if rotulo == "TOTAIS":
             totais = registro
@@ -328,7 +340,7 @@ def processar(caminho, categorias):
     """Lê um boletim inteiro. Devolve dict com cabecalho, linhas, totais,
     margem, descartadas, paginas e problemas."""
     with pdfplumber.open(caminho) as pdf:
-        paginas = [agrupar_linhas(pag.extract_words()) for pag in pdf.pages]
+        paginas = [agrupar_linhas(pag.extract_words(return_chars=True)) for pag in pdf.pages]
     cab = extrair_cabecalho(paginas[0])
     linhas_tab, totais, margem, descartadas = extrair_tabela(paginas, categorias)
     return {"cabecalho": cab, "linhas": linhas_tab, "totais": totais, "margem": margem,
