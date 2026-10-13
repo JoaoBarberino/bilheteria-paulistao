@@ -77,13 +77,17 @@ deve ser reportado como tal.
 
 ## Fluxo de trabalho
 
-- Ao terminar uma tarefa, você mesmo faz o push da branch, abre o pull
-  request e faz o merge, usando o gh CLI. Não peça para eu fazer.
-- Se o gh não estiver instalado ou autenticado, diga isso e pare, não
-  tente contornar.
-- Depois do merge, volte para a main, dê pull e me diga em que commit
-  ficou.
+- Ao terminar uma tarefa, faça o push da branch e abra o pull request com
+  o gh CLI.
+- NÃO faça o merge. Merge é do humano. É o único ponto em que alguém lê o
+  diff antes de entrar no repositório público.
 - Nunca faça push direto na main.
+- Depois que eu mergear, eu aviso, e aí você volta para a main e dá pull.
+- Se o gh não estiver no PATH, chame pelo caminho completo e registre isso
+  aqui.
+- O gh 2.102.0 está em `C:\Program Files\GitHub CLI\` e pode não estar
+  no PATH da sessão. Caminho completo:
+  `"C:\Program Files\GitHub CLI\gh.exe"`.
 
 ## Postura
 
