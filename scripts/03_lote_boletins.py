@@ -1,9 +1,11 @@
 """Roda o parser nos boletins de data/01_raw e grava data/03_processed/boletins.csv.
 
-Uma linha por linha da tabela de setores de cada boletim. Linhas sem
-categoria e casamentos parciais rejeitados entram no CSV com setor e
-categoria vazios e status próprio, para revisão. Arquivos que o parser não
-consegue ler até TOTAIS são abortados e listados.
+Uma linha por linha da tabela de setores de cada boletim. Linhas em
+revisão (sem categoria, subtipo desconhecido, Lei ou Decreto com preço)
+entram no CSV com setor e categoria vazios e o status correspondente.
+Arquivos que o parser não consegue ler até TOTAIS são abortados e listados.
+
+Lacuna conhecida: 2025_57 fica fora da base (ver LACUNAS_CONHECIDAS).
 
 No fim imprime o relatório do lote: arquivos lidos, abortados, falhas de
 validação, linhas descartadas, rótulos em revisão, setores distintos,
@@ -26,6 +28,12 @@ SAIDA = RAIZ / "data" / "03_processed" / "boletins.csv"
 
 JOGOS_POR_ANO = {2023: 109, 2024: 104, 2025: 104, 2026: 72}
 
+# Boletins que ficam fora da base, com o motivo. Não entram números à mão.
+LACUNAS_CONHECIDAS = {
+    "2025_57.pdf": "cabeçalho da tabela sai embaralhado na extração "
+                   "('VEN A DADEVOLVIDOS...') e a linha TOTAIS não traz arrecadação",
+}
+
 # O nome do módulo começa com número, então não dá para usar import comum.
 _spec = importlib.util.spec_from_file_location(
     "parser_boletim", RAIZ / "scripts" / "02_parser_boletim.py")
@@ -35,9 +43,9 @@ _spec.loader.exec_module(parser)
 CAMPOS_CABECALHO = ["boletim", "mandante", "visitante", "data", "horario",
                     "estadio", "cidade", "uf", "competicao"]
 COLUNAS_CSV = (["ano", "jogo"] + CAMPOS_CABECALHO +
-               ["rotulo", "setor", "categoria", "categoria_boletim", "regime",
+               ["rotulo", "setor", "subtipo", "categoria", "categoria_boletim", "regime",
                 "rotulo_avanti", "status", "a_venda", "devolvidos", "vendidos",
-                "preco", "arrecadacao", "linha_fecha", "totais_conferem"])
+                "preco", "preco_derivado", "arrecadacao", "linha_fecha", "totais_conferem"])
 REVISAO = "(revisão)"
 
 
@@ -54,6 +62,7 @@ def main():
     falha_linha, falha_totais, cab_vazio = [], [], {}
     descartadas = {}
     status = Counter()
+    derivados = 0
     em_revisao = Counter()
     setores = set()
     ingressos = defaultdict(Decimal)   # (ano, regime)
@@ -82,6 +91,7 @@ def main():
 
             for l in r["linhas"]:
                 status[l["status"]] += 1
+                derivados += l["preco_derivado"]
                 if l["status"] != "casado":
                     em_revisao[(l["status"], l["rotulo"])] += 1
                 else:
@@ -90,17 +100,19 @@ def main():
                 ingressos[(ano, regime)] += l.get("VENDIDOS", 0)
                 receita[(ano, regime)] += l.get("ARRECADAÇÃO", 0)
                 fecha = ("VENDIDOS" in l and "PREÇO" in l and "ARRECADAÇÃO" in l
+                         and not l["preco_derivado"]
                          and l["VENDIDOS"] * l["PREÇO"] == l["ARRECADAÇÃO"])
                 registros.append({
                     "ano": ano, "jogo": jogo,
                     **{c: cab.get(c, "") for c in CAMPOS_CABECALHO},
-                    "rotulo": l["rotulo"], "setor": l["setor"] or "",
+                    "rotulo": l["rotulo"], "setor": l["setor"] or "", "subtipo": l["subtipo"] or "",
                     "categoria": l["categoria"] or "",
                     "categoria_boletim": l["categoria_boletim"] or "",
                     "regime": l["regime"] or "", "rotulo_avanti": l["rotulo_avanti"] or "",
                     "status": l["status"],
                     "a_venda": l.get("A VENDA", ""), "devolvidos": l.get("DEVOLVIDOS", ""),
                     "vendidos": l.get("VENDIDOS", ""), "preco": l.get("PREÇO", ""),
+                    "preco_derivado": l["preco_derivado"],
                     "arrecadacao": l.get("ARRECADAÇÃO", ""),
                     "linha_fecha": fecha, "totais_conferem": not probs_totais,
                 })
@@ -117,7 +129,8 @@ def main():
     print(f"Processados até o fim: {esperados - len(abortados)}")
     print(f"Abortados: {len(abortados)}")
     for nome, erro in abortados:
-        print(f"  {nome}: {erro}")
+        lacuna = LACUNAS_CONHECIDAS.get(nome)
+        print(f"  {nome}: {'lacuna conhecida, ' + lacuna if lacuna else erro}")
     print(f"Registros gravados em {SAIDA.relative_to(RAIZ)}: {len(registros)}")
     print(f"Jogos distintos na base: {len(jogos)}")
     print()
@@ -135,9 +148,14 @@ def main():
     for c, n in Counter(c for v in cab_vazio.values() for c in v).most_common():
         print(f"  {c}: {n}")
     print()
+    print(f"Linhas com preço derivado: {derivados}")
     print(f"Linhas casadas: {status['casado']}")
-    print(f"Casamentos parciais rejeitados: {status['parcial_rejeitado']}")
+    print(f"Subtipo desconhecido: {status['subtipo_desconhecido']}")
+    print(f"Gratuidade com preço (revisão): {status['revisao_preco']}")
     print(f"Linhas sem categoria: {status['sem_categoria']}")
+    ti = sum(ingressos.values())
+    tr = sum(v for (_, g), v in ingressos.items() if g == REVISAO)
+    print(f"Ingressos em revisão: {tr:,.0f} de {ti:,.0f} ({pct(tr, ti)}%)")
     for (st, rotulo), n in sorted(em_revisao.items()):
         print(f"  ({n}) [{st}] {rotulo}")
     print(f"Setores distintos (linhas casadas): {len(setores)}")

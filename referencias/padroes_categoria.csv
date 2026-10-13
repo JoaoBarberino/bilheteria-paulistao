@@ -1,0 +1,11 @@
+padrao,categoria,regime,guarda_preco
+ST - .+,Sócio,socio,nao
+Avanti\b.*,Avanti,socio,nao
+Sócio Contr\. .+,Sócio,socio,nao
+Sócio Diamante,Sócio,socio,nao
+Sócio Platinum,Sócio,socio,nao
+Proprietário.*,Proprietário,contrato,nao
+Smart .+,Smart,contrato,nao
+[^-]*Corporativo,Corporativo,contrato,nao
+(?i:lei)\b.*,Gratuidade legal,gratuidade,sim
+(?i:decreto)\b.*,Gratuidade legal,gratuidade,sim

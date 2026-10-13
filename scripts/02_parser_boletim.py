@@ -6,21 +6,29 @@ eixo x, o que reassocia preço e arrecadação ao setor da mesma linha mesmo
 quando a extração de texto os separa. A tabela de setores pode continuar nas
 páginas seguintes; a leitura vai até a linha TOTAIS.
 
-O rótulo de cada linha é separado em setor e categoria casando a categoria
-pelo fim do rótulo (cada categoria tem um regime: mercado, socio,
-contrato, gratuidade ou nao_vendido):
-- segmento que começa com "Lei" vira "Gratuidade legal" (leis municipais de
-  gratuidade variam por cidade, então o casamento é por padrão);
-- o resto casa com o dicionário em referencias/categorias_boletim.csv, sufixo
-  mais longo primeiro. Rótulo que não casa fica sem setor e sem categoria e é
-  listado;
-- se sobrar no setor um segmento em caixa mista ou "P.C.D.", o casamento é
-  parcial e é rejeitado, indo para a mesma lista de revisão.
+O rótulo de cada linha vira setor, subtipo e categoria. A categoria casa
+pelo fim do rótulo, sufixo mais longo primeiro, contra:
+- referencias/categorias_boletim.csv, casamento literal;
+- referencias/padroes_categoria.csv, expressão regular (Lei, Decreto, ST,
+  Avanti, ...).
+Guarda de preço: categoria de regime gratuidade, ou padrão com
+guarda_preco=sim, só vale para preço zero; com preço acima de zero a linha
+vai para revisão.
+Entre setor e categoria pode haver um subtipo (faixa de produto, como
+"Geral" ou "Carnê"), listado em referencias/subtipos.csv. Se o subtipo tem
+regime próprio, o regime segue o subtipo; senão segue a categoria. Um
+segmento em caixa mista que não seja subtipo conhecido manda a linha para
+revisão. Rótulo sem categoria também vai para revisão, nunca para chute.
 
-Linhas vazias do formulário (sem rótulo, sem quantidades, R$ 0,00) são
-descartadas e contadas. Extrai o cabeçalho e a tabela, valida cada linha
-(vendidos * preço = arrecadação) e a soma contra a linha TOTAIS, e imprime
-tudo na tela. Não grava nada em disco.
+Rótulos quebrados em duas linhas ("... - Carnê de" / números /
+"Relacionamento") são juntados. Linhas vazias do formulário (sem rótulo,
+sem quantidades, R$ 0,00) são descartadas e contadas. Em Fiel Torcedor com
+preço impresso R$ 0,00 e arrecadação positiva, o preço é derivado por
+arrecadação / vendidos e marcado como preco_derivado.
+
+Extrai o cabeçalho e a tabela, valida cada linha (vendidos * preço =
+arrecadação, exceto preço derivado) e a soma contra a linha TOTAIS, e
+imprime tudo na tela. Não grava nada em disco.
 
 Uso, a partir da raiz do repositório:
     python scripts/02_parser_boletim.py
@@ -37,11 +45,7 @@ import pdfplumber
 
 RAIZ = Path(__file__).resolve().parent.parent
 ARQUIVO_PADRAO = RAIZ / "data" / "01_raw" / "2026" / "2026_72.pdf"
-ARQUIVO_CATEGORIAS = RAIZ / "referencias" / "categorias_boletim.csv"
-
-GRATUIDADE_LEGAL = "Gratuidade legal"
-# "Lei n. 4046/14", "Lei nº9266/10", "Lei 6145/18", "LEI ..."
-PADRAO_LEI = re.compile(r"^lei\b", re.IGNORECASE)
+PASTA_REFERENCIAS = RAIZ / "referencias"
 RODAPE = "Federação Paulista de Futebol"
 # Detector de casamento parcial. Não usa str.islower: "º" conta como
 # minúscula e aparece em setores ("CAMAROTES 3º ANDAR").
@@ -135,10 +139,19 @@ def extrair_cabecalho(linhas):
     return cab
 
 
-def carregar_categorias(caminho=ARQUIVO_CATEGORIAS):
-    """Dicionário {categoria como aparece no boletim: linha do CSV}."""
-    with open(caminho, encoding="utf-8", newline="") as f:
-        return {l["categoria_boletim"]: l for l in csv.DictReader(f)}
+def _ler_csv(nome):
+    with open(PASTA_REFERENCIAS / nome, encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def carregar_categorias():
+    """Referências de classificação: literais, padrões e subtipos."""
+    return {
+        "literais": {l["categoria_boletim"]: l for l in _ler_csv("categorias_boletim.csv")},
+        "padroes": [{**l, "re": re.compile(l["padrao"])}
+                    for l in _ler_csv("padroes_categoria.csv")],
+        "subtipos": {l["subtipo"]: l["regime"] or None for l in _ler_csv("subtipos.csv")},
+    }
 
 
 def segmentos(rotulo):
@@ -158,39 +171,47 @@ def setor_suspeito(segs_setor):
     return any(MINUSCULA.search(s) or s in MARCADORES_CATEGORIA for s in segs_setor)
 
 
-def separar_setor_categoria(rotulo, categorias):
-    """Casa a categoria pelo fim do rótulo.
+def casar_categoria(sufixo, refs):
+    """Literal primeiro, depois padrões. Devolve a referência ou None."""
+    if sufixo in refs["literais"]:
+        return {**refs["literais"][sufixo], "guarda_preco": "nao"}
+    for p in refs["padroes"]:
+        if p["re"].fullmatch(sufixo):
+            avanti = sufixo.removeprefix("Avanti").strip(" -") if p["categoria"] == "Avanti" else ""
+            return {"categoria": p["categoria"], "regime": p["regime"],
+                    "rotulo_avanti": avanti, "guarda_preco": p["guarda_preco"]}
+    return None
 
-    Ordem: primeiro um segmento que começa com "Lei" (gratuidade legal, por
-    padrão); depois o dicionário, sufixo mais longo primeiro. O setor precisa
-    ter ao menos um segmento. Se o setor que sobra for suspeito, o casamento
-    é rejeitado. Devolve dict com setor, categoria, categoria_boletim, regime,
-    rotulo_avanti e status ("casado", "parcial_rejeitado", "sem_categoria").
+
+def separar_setor_categoria(rotulo, refs, preco=None):
+    """Separa o rótulo em setor, subtipo e categoria.
+
+    Devolve dict com setor, subtipo, categoria, categoria_boletim, regime,
+    rotulo_avanti e status: "casado", "sem_categoria", "subtipo_desconhecido"
+    ou "revisao_preco" (padrão com guarda e preço acima de zero).
     """
-    vazio = {"setor": None, "categoria": None, "categoria_boletim": None,
+    vazio = {"setor": None, "subtipo": None, "categoria": None, "categoria_boletim": None,
              "regime": None, "rotulo_avanti": None}
     segs = segmentos(rotulo)
-    achado = None
     for i in range(1, len(segs)):
-        if PADRAO_LEI.match(segs[i]):
-            achado = i, {"categoria": GRATUIDADE_LEGAL, "regime": "gratuidade",
-                         "rotulo_avanti": None}
+        cat = casar_categoria(" - ".join(segs[i:]), refs)
+        if cat:
             break
-    if achado is None:
-        for i in range(1, len(segs)):
-            sufixo = " - ".join(segs[i:])
-            if sufixo in categorias:
-                c = categorias[sufixo]
-                achado = i, {"categoria": c["categoria"], "regime": c["regime"],
-                             "rotulo_avanti": c["rotulo_avanti"] or None}
-                break
-    if achado is None:
+    else:
         return {**vazio, "status": "sem_categoria"}
-    i, cat = achado
-    if setor_suspeito(segs[:i]):
-        return {**vazio, "status": "parcial_rejeitado"}
-    return {"setor": " - ".join(segs[:i]), "categoria_boletim": " - ".join(segs[i:]),
-            **cat, "status": "casado"}
+    prefixo, subtipo = segs[:i], None
+    if len(prefixo) >= 2 and prefixo[-1] in refs["subtipos"]:
+        subtipo, prefixo = prefixo[-1], prefixo[:-1]
+    if setor_suspeito(prefixo):
+        return {**vazio, "status": "subtipo_desconhecido"}
+    # Guarda: gratuidade não tem preço. Vale para padrões com guarda_preco=sim
+    # e para qualquer categoria de regime gratuidade.
+    if (cat["guarda_preco"] == "sim" or cat["regime"] == "gratuidade") and preco:
+        return {**vazio, "status": "revisao_preco"}
+    regime = (refs["subtipos"][subtipo] if subtipo else None) or cat["regime"]
+    return {"setor": " - ".join(prefixo), "subtipo": subtipo, "categoria": cat["categoria"],
+            "categoria_boletim": " - ".join(segs[i:]), "regime": regime,
+            "rotulo_avanti": cat["rotulo_avanti"] or None, "status": "casado"}
 
 
 def centros_colunas(cab):
@@ -219,7 +240,50 @@ def eh_linha_vazia(registro):
             and registro.get("PREÇO", 0) == 0 and registro.get("ARRECADAÇÃO", 0) == 0)
 
 
-def extrair_tabela(paginas, categorias):
+def juntar_continuacoes(registros):
+    """Junta rótulos quebrados em duas linhas.
+
+    No PDF a linha fica: rótulo sem números, depois números sem rótulo,
+    depois o resto do rótulo sem números. Vira um registro só.
+    """
+    saida, pendente, juntou = [], None, False
+    for r in registros:
+        tem_valores = any(c in r for c in COLUNAS)
+        if r["rotulo"] and not tem_valores:
+            if juntou:
+                saida[-1]["rotulo"] += " " + r["rotulo"]
+                juntou = False
+            elif pendente is None:
+                pendente = r["rotulo"]
+            else:
+                saida.append({"rotulo": pendente})
+                pendente = r["rotulo"]
+            continue
+        juntou = False
+        if not r["rotulo"] and tem_valores and pendente is not None:
+            r = {**r, "rotulo": pendente}
+            juntou = True
+        elif pendente is not None:
+            saida.append({"rotulo": pendente})
+        pendente = None
+        saida.append(r)
+    if pendente is not None:
+        saida.append({"rotulo": pendente})
+    return saida
+
+
+def derivar_preco(r):
+    """Fiel Torcedor com preço impresso R$ 0,00 e arrecadação positiva: o
+    boletim não traz preço unitário. Usa arrecadação / vendidos, que é preço
+    médio da linha, não preço de tabela."""
+    r["preco_derivado"] = False
+    if (r.get("categoria_boletim") == "Fiel Torcedor" and r.get("PREÇO") == 0
+            and r.get("ARRECADAÇÃO", 0) > 0 and r.get("VENDIDOS", 0) > 0):
+        r["PREÇO"] = (r["ARRECADAÇÃO"] / r["VENDIDOS"]).quantize(Decimal("0.01"))
+        r["preco_derivado"] = True
+
+
+def extrair_tabela(paginas, refs):
     """paginas: lista de linhas por página. Lê da linha LOCALIDADES da
     primeira página até TOTAIS, atravessando quebras de página. As páginas
     seguintes não repetem o cabeçalho; usa as colunas da primeira."""
@@ -228,7 +292,7 @@ def extrair_tabela(paginas, categorias):
     x_inicio_numeros = min(centros.values()) - 20
     linhas = paginas[0][i_cab + 1:] + [l for pag in paginas[1:] for l in pag]
 
-    linhas_tab, totais, margem, descartadas = [], None, [], 0
+    brutos, totais, margem = [], None, []
     for linha in linhas:
         margem += [p["text"] for p in linha if p["x1"] < MARGEM_ESQUERDA]
         ps = [p for p in linha if p["x1"] >= MARGEM_ESQUERDA]
@@ -252,13 +316,18 @@ def extrair_tabela(paginas, categorias):
         if rotulo == "TOTAIS":
             totais = registro
             break
+        brutos.append(registro)
+    if totais is None:
+        raise ValueError("Linha TOTAIS não encontrada")
+
+    linhas_tab, descartadas = [], 0
+    for registro in juntar_continuacoes(brutos):
         if eh_linha_vazia(registro):
             descartadas += 1
             continue
-        registro.update(separar_setor_categoria(rotulo, categorias))
+        registro.update(separar_setor_categoria(registro["rotulo"], refs, registro.get("PREÇO")))
+        derivar_preco(registro)
         linhas_tab.append(registro)
-    if totais is None:
-        raise ValueError("Linha TOTAIS não encontrada")
     return linhas_tab, totais, margem, descartadas
 
 
@@ -269,7 +338,7 @@ def validar(linhas_tab, totais):
         if faltando:
             problemas.append(f"linha {k} ({r['rotulo']}): colunas ausentes {faltando}")
             continue
-        if r["VENDIDOS"] * r["PREÇO"] != r["ARRECADAÇÃO"]:
+        if not r.get("preco_derivado") and r["VENDIDOS"] * r["PREÇO"] != r["ARRECADAÇÃO"]:
             problemas.append(
                 f"linha {k} ({r['rotulo']}): {r['VENDIDOS']} x {r['PREÇO']} = "
                 f"{r['VENDIDOS'] * r['PREÇO']}, boletim diz {r['ARRECADAÇÃO']}")
@@ -301,28 +370,35 @@ def imprimir(caminho, cab, linhas_tab, totais, margem, descartadas, problemas):
     print()
     print("TABELA DE SETORES")
     w_s = max(len(r["setor"] or "?") for r in linhas_tab)
+    w_t = max(len(r["subtipo"] or "") for r in linhas_tab + [{"subtipo": "Subtipo"}])
     w_c = max(len(r["categoria"] or "?") for r in linhas_tab)
-    print(f"  {'#':>2}  {'Setor':<{w_s}}  {'Categoria':<{w_c}}  {'Regime':<11}  {'A venda':>7}  "
-          f"{'Devolv.':>7}  {'Vendidos':>8}  {'Preço':>8}  {'Arrecadação':>13}")
+
+    def num(r, col, casas=2):
+        return fmt_br(r[col], casas) if col in r else "?"
+
+    print(f"  {'#':>2}  {'Setor':<{w_s}}  {'Subtipo':<{w_t}}  {'Categoria':<{w_c}}  {'Regime':<11}  "
+          f"{'A venda':>7}  {'Devolv.':>7}  {'Vendidos':>8}  {'Preço':>8}  {'Arrecadação':>13}")
     for k, r in enumerate(linhas_tab, 1):
-        print(f"  {k:>2}  {r['setor'] or '?':<{w_s}}  {r['categoria'] or '?':<{w_c}}  "
-              f"{r['regime'] or '?':<11}  "
-              f"{fmt_br(r['A VENDA'], 0):>7}  {fmt_br(r['DEVOLVIDOS'], 0):>7}  "
-              f"{fmt_br(r['VENDIDOS'], 0):>8}  {fmt_br(r['PREÇO']):>8}  "
-              f"{fmt_br(r['ARRECADAÇÃO']):>13}")
-    print(f"  {'':>2}  {'TOTAIS':<{w_s}}  {'':<{w_c}}  {'':<11}  {fmt_br(totais['A VENDA'], 0):>7}  "
+        print(f"  {k:>2}  {r['setor'] or '?':<{w_s}}  {r['subtipo'] or '':<{w_t}}  "
+              f"{r['categoria'] or '?':<{w_c}}  {r['regime'] or '?':<11}  "
+              f"{num(r, 'A VENDA', 0):>7}  {num(r, 'DEVOLVIDOS', 0):>7}  "
+              f"{num(r, 'VENDIDOS', 0):>8}  {num(r, 'PREÇO'):>8}  "
+              f"{num(r, 'ARRECADAÇÃO'):>13}")
+    print(f"  {'':>2}  {'TOTAIS':<{w_s}}  {'':<{w_t}}  {'':<{w_c}}  {'':<11}  {fmt_br(totais['A VENDA'], 0):>7}  "
           f"{fmt_br(totais['DEVOLVIDOS'], 0):>7}  {fmt_br(totais['VENDIDOS'], 0):>8}  "
           f"{'':>8}  {fmt_br(totais['ARRECADAÇÃO']):>13}")
     print()
     print(f"Linhas de setor extraídas: {len(linhas_tab)}")
     print(f"Linhas vazias do formulário descartadas: {descartadas}")
     sem_categoria = [r["rotulo"] for r in linhas_tab if r["status"] == "sem_categoria"]
-    parciais = [r["rotulo"] for r in linhas_tab if r["status"] == "parcial_rejeitado"]
+    outros = [f"{r['rotulo']} [{r['status']}]" for r in linhas_tab
+              if r["status"] not in ("casado", "sem_categoria")]
     print(f"Rótulos sem categoria no dicionário: {sem_categoria or 'nenhum'}")
-    print(f"Casamentos parciais rejeitados: {parciais or 'nenhum'}")
+    print(f"Outras linhas em revisão: {outros or 'nenhuma'}")
+    print(f"Linhas com preço derivado: {sum(r['preco_derivado'] for r in linhas_tab)}")
     leis = sorted({r["categoria_boletim"] for r in linhas_tab
-                   if r["categoria"] == GRATUIDADE_LEGAL})
-    print(f"Gratuidade legal, texto original: {leis or 'nenhuma'}")
+                   if r["regime"] == "gratuidade"})
+    print(f"Gratuidades, texto original: {leis or 'nenhuma'}")
     ausentes = [c for c, v in cab.items() if not v]
     print(f"Campos de cabeçalho vazios: {ausentes or 'nenhum'}")
     print(f"Palavras ignoradas na margem esquerda: {' '.join(margem) or 'nenhuma'}")

@@ -100,5 +100,45 @@ class TestFixtures(unittest.TestCase):
             self.assertEqual(l["regime"], "mercado")
 
 
+class TestClassificacao(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.refs = parser.carregar_categorias()
+
+    def test_subtipo(self):
+        r = parser.separar_setor_categoria("CABECEIRA PRINCIPAL - SUL - Geral - Inteira", self.refs)
+        self.assertEqual((r["setor"], r["subtipo"], r["categoria"], r["regime"]),
+                         ("CABECEIRA PRINCIPAL - SUL", "Geral", "Inteira", "mercado"))
+
+    def test_subtipo_contratual_define_regime(self):
+        r = parser.separar_setor_categoria("JOHNNIE WALKER - Carnê - Inteira", self.refs)
+        self.assertEqual((r["subtipo"], r["categoria"], r["regime"]), ("Carnê", "Inteira", "contrato"))
+
+    def test_lei_com_preco_vai_para_revisao(self):
+        r = parser.separar_setor_categoria("ARQUIBANCADA - Lei n. 4046/14 - Novorizonte",
+                                           self.refs, Decimal("30.00"))
+        self.assertEqual(r["status"], "revisao_preco")
+
+    def test_meia_legal_literal(self):
+        r = parser.separar_setor_categoria(
+            "ARQUIBANCADA - Lei nº18.159- Meia entrada, menores de 12 anos", self.refs, Decimal("30.00"))
+        self.assertEqual((r["categoria"], r["regime"], r["status"]), ("Meia legal", "mercado", "casado"))
+
+    def test_juntar_continuacao(self):
+        brutos = [{"rotulo": "SETOR X - Carnê de"},
+                  {"rotulo": "", "VENDIDOS": Decimal("218"), "PREÇO": Decimal("20.00")},
+                  {"rotulo": "Relacionamento"}]
+        self.assertEqual(parser.juntar_continuacoes(brutos),
+                         [{"rotulo": "SETOR X - Carnê de Relacionamento",
+                           "VENDIDOS": Decimal("218"), "PREÇO": Decimal("20.00")}])
+
+    def test_preco_derivado_fiel_torcedor(self):
+        r = {"categoria_boletim": "Fiel Torcedor", "VENDIDOS": Decimal("8109"),
+             "PREÇO": Decimal("0.00"), "ARRECADAÇÃO": Decimal("281873.00")}
+        parser.derivar_preco(r)
+        self.assertTrue(r["preco_derivado"])
+        self.assertEqual(r["PREÇO"], Decimal("34.76"))
+
+
 if __name__ == "__main__":
     unittest.main()
