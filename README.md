@@ -4,6 +4,19 @@ Análise da elasticidade-preço da demanda por ingresso no Campeonato
 Paulista Série A1, de 2023 a 2026, a partir dos boletins financeiros
 oficiais de partida da Federação Paulista de Futebol.
 
+Este projeto mede a elasticidade-preço da demanda por ingresso no
+Paulistão Série A1, em 389 boletins financeiros oficiais de 2023 a 2026,
+com efeito fixo de partida e de setor.
+
+Quando um setor fica 10% mais caro que os outros setores do mesmo jogo, o
+público dele cai cerca de 4,4%. A elasticidade estimada é -0,468, com
+intervalo de confiança de 95% de -0,883 a -0,053. A demanda é inelástica
+em todo o intervalo.
+
+O número vale para preço relativo entre setores da mesma partida. Esta
+base não mede o efeito de uma alta geral de preço, pelo motivo na
+limitação 1.
+
 ## Problema
 
 Os 20 maiores clubes brasileiros fecharam 2025 com receita somada de cerca

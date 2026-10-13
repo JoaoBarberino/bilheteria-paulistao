@@ -72,6 +72,8 @@ deve ser reportado como tal.
 - README na ordem: **problema, método, resultado, limitações metodológicas
   conhecidas**. A seção de limitações é obrigatória e não é opcional nem
   resumida.
+- Exceção deliberada, decidida pelo autor: o README abre com um resumo do
+  resultado principal entre o título e a seção Problema, antes da ordem acima.
 - Prosa direta, frases curtas. Sem travessão. Sem linguagem promocional.
 - Gráfico sem rótulo de eixo e sem unidade não entra.
 
