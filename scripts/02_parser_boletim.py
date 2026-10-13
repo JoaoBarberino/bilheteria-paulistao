@@ -25,6 +25,9 @@ pela comparação com a Inteira do mesmo setor no mesmo jogo, ou revisão.
 Detector preco_quebrado: preço com centavos diferentes de 00, fora os
 derivados. Só marca, não reclassifica.
 
+Meia-entrada é metade da Inteira por lei. Meia fora da metade sai de
+mercado e vai para revisão, exceto P.C.D. (ver marcar_meia).
+
 Rótulos quebrados em duas linhas ("... - Carnê de" / números /
 "Relacionamento") são juntados. Linhas vazias do formulário (sem rótulo,
 sem quantidades, R$ 0,00) são descartadas e contadas. Em Fiel Torcedor com
@@ -56,6 +59,7 @@ RODAPE = "Federação Paulista de Futebol"
 # minúscula e aparece em setores ("CAMAROTES 3º ANDAR").
 MINUSCULA = re.compile(r"[a-zà-öø-ÿ]")
 SUBTIPO_PCD = "P.C.D."
+TOLERANCIA_MEIA = Decimal("0.01")
 MARCADORES_CATEGORIA = {SUBTIPO_PCD}
 
 COLUNAS = ["A VENDA", "DEVOLVIDOS", "VENDIDOS", "PREÇO", "ARRECADAÇÃO"]
@@ -327,6 +331,44 @@ def resolver_pcd(linhas_tab):
                  pcd_decisao="revisao")
 
 
+def marcar_meia(linhas_tab):
+    """Meia-entrada é, por lei, metade da Inteira.
+
+    meia_fora_da_metade, para categoria Meia: compara com a Inteira de
+    regime mercado do mesmo setor e mesmo subtipo; sem ela, com a Inteira
+    de mercado do setor sem subtipo. Nunca compara com Inteira de outro
+    subtipo (uma Meia local não é medida contra a Inteira de Visitante).
+    False se o preço for metade de alguma delas, com tolerância de R$ 0,01;
+    True se não for; None se não houver referência, e também para as demais
+    categorias.
+
+    Meia fora da metade sai do regime mercado e vai para revisão
+    ("revisao_meia"), exceto subtipo P.C.D. (preço de acessibilidade).
+    Setor, subtipo e categoria são mantidos para conferência.
+
+    preco_regulado: categoria Meia, ou subtipo/categoria P.C.D. São preços
+    de obrigação legal ou de acessibilidade, não decisão comercial.
+    """
+    inteiras = {}
+    for r in linhas_tab:
+        if r["status"] == "casado" and r["categoria"] == "Inteira" and r["regime"] == "mercado":
+            inteiras.setdefault((r["setor"], r["subtipo"]), set()).add(r["PREÇO"])
+    for r in linhas_tab:
+        r["meia_fora_da_metade"] = None
+        if r["categoria"] != "Meia" or r.get("PREÇO") is None:
+            continue
+        ref = inteiras.get((r["setor"], r["subtipo"])) or inteiras.get((r["setor"], None))
+        if not ref:
+            continue
+        fora = all(abs(r["PREÇO"] - i / 2) > TOLERANCIA_MEIA for i in ref)
+        r["meia_fora_da_metade"] = fora
+        if fora and r["regime"] == "mercado" and r["subtipo"] != SUBTIPO_PCD:
+            r.update(regime=None, status="revisao_meia")
+    for r in linhas_tab:
+        r["preco_regulado"] = (r["categoria"] in ("Meia", SUBTIPO_PCD)
+                               or r["subtipo"] == SUBTIPO_PCD)
+
+
 def marcar_preco_quebrado(r):
     """Detector, sem ação: preço com centavos diferentes de 00 que não foi
     derivado. Preço de mercado costuma ser redondo."""
@@ -382,6 +424,7 @@ def extrair_tabela(paginas, refs):
         marcar_preco_quebrado(registro)
         linhas_tab.append(registro)
     resolver_pcd(linhas_tab)
+    marcar_meia(linhas_tab)
     return linhas_tab, totais, margem, descartadas
 
 

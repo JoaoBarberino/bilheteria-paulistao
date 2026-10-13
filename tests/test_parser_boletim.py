@@ -28,8 +28,8 @@ GABARITO_2026_72 = [
     ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Meia", "611", "65.00", "39715.00"),
     ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Sócio", "486", "20.00", "9720.00"),
     ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Gratuidade legal", "985", "0.00", "0.00"),
-    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Visitante - Inteira", "1725", "250.00", "431250.00"),
-    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Visitante - Meia", "615", "125.00", "76875.00"),
+    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Inteira", "1725", "250.00", "431250.00"),
+    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Meia", "615", "125.00", "76875.00"),
     ("ARQUIBANCADA INFERIOR", "Inteira", "112", "250.00", "28000.00"),
     ("ARQUIBANCADA INFERIOR", "Meia", "252", "125.00", "31500.00"),
     ("ARQUIBANCADA INFERIOR", "Sócio", "266", "20.00", "5320.00"),
@@ -37,8 +37,8 @@ GABARITO_2026_72 = [
     ("CAMAROTES", "Carnê de Relacionamento", "27", "20.00", "540.00"),
     ("CATIVAS SÓCIOS", "Sócio", "251", "20.00", "5020.00"),
     ("CATIVAS SÓCIOS", "Gratuidade legal", "124", "0.00", "0.00"),
-    ("SETOR B*", "Visitante - Inteira", "1791", "250.00", "447750.00"),
-    ("SETOR B*", "Visitante - Meia", "316", "125.00", "39500.00"),
+    ("SETOR B*", "Inteira", "1791", "250.00", "447750.00"),
+    ("SETOR B*", "Meia", "316", "125.00", "39500.00"),
     ("SETOR B*", "Gratuidade legal", "251", "0.00", "0.00"),
 ]
 
@@ -73,6 +73,11 @@ class TestGabarito2026_72(unittest.TestCase):
         self.assertEqual(self.r["problemas"], [])
 
 
+# Única linha dos fixtures que sai de casado: Meia a R$ 50,43 com Inteira do
+# setor a R$ 60,00 (meia fora da metade).
+NAO_CASADOS_ESPERADOS = {"2023_55.pdf": ["CAMAROTES 4º ANDAR - Especial - Meia"]}
+
+
 class TestFixtures(unittest.TestCase):
     """Os outros boletins cobrem: tabela em 3 páginas e P.C.D./Especial
     (2023_55), linhas vazias do formulário e VENDA PROIBIDA (2024_52), PCR,
@@ -85,7 +90,7 @@ class TestFixtures(unittest.TestCase):
                 r = parser.processar(pdf, categorias)
                 self.assertEqual(r["problemas"], [])
                 nao_casados = [l["rotulo"] for l in r["linhas"] if l["status"] != "casado"]
-                self.assertEqual(nao_casados, [])
+                self.assertEqual(nao_casados, NAO_CASADOS_ESPERADOS.get(pdf.name, []))
 
     def test_linhas_vazias_descartadas(self):
         r = parser.processar(FIXTURES / "2024_52.pdf", parser.carregar_categorias())
@@ -100,8 +105,8 @@ class TestFixtures(unittest.TestCase):
                              ("P.C.D.", "Inteira", "mercado"))
         esp = [l for l in r["linhas"] if l["rotulo"] == "CAMAROTES 4º ANDAR - Especial - Meia"]
         self.assertEqual(len(esp), 1)
-        self.assertEqual((esp[0]["setor"], esp[0]["subtipo"], esp[0]["categoria"], esp[0]["regime"]),
-                         ("CAMAROTES 4º ANDAR", "Especial", "Meia", "mercado"))
+        self.assertEqual((esp[0]["setor"], esp[0]["subtipo"], esp[0]["categoria"]),
+                         ("CAMAROTES 4º ANDAR", "Especial", "Meia"))
 
 
 class TestClassificacao(unittest.TestCase):
@@ -220,6 +225,84 @@ class TestDecisoesRegime(unittest.TestCase):
         r = self.sep("ARQUIBANCADA - Promoção - Menor")
         self.assertEqual((r["setor"], r["subtipo"], r["categoria"], r["regime"]),
                          ("ARQUIBANCADA", "Promoção", "Menor", "mercado"))
+
+
+def _linha(rotulo, preco, refs):
+    r = {"rotulo": rotulo, "PREÇO": Decimal(preco)}
+    r.update(parser.separar_setor_categoria(rotulo, refs, r["PREÇO"]))
+    return r
+
+
+class TestMeiaRegulada(unittest.TestCase):
+    """Itens 1 a 4 da rodada de meia-entrada."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.refs = parser.carregar_categorias()
+
+    def jogo(self, *linhas):
+        tab = [_linha(rot, preco, self.refs) for rot, preco in linhas]
+        parser.resolver_pcd(tab)
+        parser.marcar_meia(tab)
+        return tab
+
+    def test_1_meia_na_metade_e_false(self):
+        tab = self.jogo(("SETOR A - Inteira", "60.00"), ("SETOR A - Meia", "30.00"))
+        self.assertIs(tab[1]["meia_fora_da_metade"], False)
+        self.assertIsNone(tab[0]["meia_fora_da_metade"])
+
+    def test_1_meia_fora_da_metade_e_true(self):
+        tab = self.jogo(("SETOR A - Inteira", "30.00"), ("SETOR A - Meia", "20.00"))
+        self.assertIs(tab[1]["meia_fora_da_metade"], True)
+
+    def test_1_tolerancia_de_um_centavo(self):
+        tab = self.jogo(("SETOR A - Inteira", "50.01"), ("SETOR A - Meia", "25.00"))
+        self.assertIs(tab[1]["meia_fora_da_metade"], False)
+
+    def test_1_sem_inteira_no_setor_e_nula(self):
+        tab = self.jogo(("SETOR A - Inteira", "60.00"), ("SETOR B - Meia", "30.00"))
+        self.assertIsNone(tab[1]["meia_fora_da_metade"])
+
+    def test_1_compara_com_inteira_do_mesmo_subtipo(self):
+        # Meia sem subtipo a R$ 25 é metade da Inteira sem subtipo (R$ 50),
+        # não da Inteira do camarote especial (R$ 300).
+        tab = self.jogo(("SETOR A - Inteira", "50.00"),
+                        ("SETOR A - Camarote dos Ídolos - Inteira", "300.00"),
+                        ("SETOR A - Meia", "25.00"))
+        self.assertIs(tab[2]["meia_fora_da_metade"], False)
+
+    def test_1_meia_local_nao_compara_com_inteira_de_visitante(self):
+        tab = self.jogo(("SUL - Visitante - Inteira", "100.00"), ("SUL - Meia", "60.00"))
+        self.assertIsNone(tab[1]["meia_fora_da_metade"])
+        self.assertEqual(tab[1]["regime"], "mercado")
+
+    def test_2_meia_fora_sai_de_mercado(self):
+        tab = self.jogo(("CAMAROTES 4º ANDAR - Inteira", "60.00"),
+                        ("CAMAROTES 4º ANDAR - Especial - Meia", "50.43"))
+        r = tab[1]
+        self.assertEqual((r["status"], r["regime"]), ("revisao_meia", None))
+        self.assertEqual((r["setor"], r["subtipo"], r["categoria"]),
+                         ("CAMAROTES 4º ANDAR", "Especial", "Meia"))
+
+    def test_2_e_3_pcd_fora_da_metade_fica_em_mercado(self):
+        tab = self.jogo(("GOL SUL - Inteira", "90.00"), ("GOL SUL - P.C.D. - Meia", "30.00"))
+        r = tab[1]
+        self.assertIs(r["meia_fora_da_metade"], True)
+        self.assertEqual((r["status"], r["regime"], r["preco_regulado"]), ("casado", "mercado", True))
+
+    def test_3_preco_regulado(self):
+        tab = self.jogo(("SETOR A - Inteira", "60.00"), ("SETOR A - Meia", "30.00"),
+                        ("SETOR A - P.C.D. - Inteira", "60.00"), ("SETOR A - Sócio", "20.00"))
+        self.assertEqual([r["preco_regulado"] for r in tab], [False, True, True, False])
+
+    def test_4_nenhum_literal_com_meia_ou_inteira_como_sufixo(self):
+        for literal in self.refs["literais"]:
+            if literal in ("Meia", "Inteira"):
+                continue
+            ultimo = parser.segmentos(literal)[-1]
+            with self.subTest(literal=literal):
+                self.assertNotIn(ultimo, ("Meia", "Inteira"))
+        self.assertNotIn("Especial - Meia", self.refs["literais"])
 
 
 if __name__ == "__main__":
