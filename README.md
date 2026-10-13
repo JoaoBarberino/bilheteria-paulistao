@@ -1,9 +1,5 @@
 # Bilheteria do Paulistão: como o público responde ao preço do ingresso
 
-Análise da elasticidade-preço da demanda por ingresso no Campeonato
-Paulista Série A1, de 2023 a 2026, a partir dos boletins financeiros
-oficiais de partida da Federação Paulista de Futebol.
-
 Este projeto mede a elasticidade-preço da demanda por ingresso no
 Paulistão Série A1, em 389 boletins financeiros oficiais de 2023 a 2026,
 com efeito fixo de partida e de setor.
