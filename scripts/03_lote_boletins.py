@@ -66,32 +66,41 @@ def linha_fecha(l):
 
 
 def tabela_razao(linhas_por_jogo):
-    """Razão preço / Inteira do mesmo setor e mesmo subtipo, no mesmo jogo,
-    por categoria de regime mercado. Só entra linha com uma única Inteira de
-    referência, de preço acima de zero."""
-    obs = defaultdict(list)
+    """Razão entre o preço e a Inteira, e entre o preço e a Meia, do mesmo
+    setor e mesmo subtipo, no mesmo jogo, por categoria de regime mercado.
+    Cada razão só usa linha com uma única referência, de preço acima de
+    zero. A razão sobre a Meia é a que revela taxa de conveniência sobre a
+    meia-entrada."""
+    obs = {"Inteira": defaultdict(list), "Meia": defaultdict(list)}
     for linhas in linhas_por_jogo:
-        ref = defaultdict(set)
+        ref = {"Inteira": defaultdict(set), "Meia": defaultdict(set)}
         for l in linhas:
-            if l["status"] == "casado" and l["categoria"] == "Inteira" and l["regime"] == "mercado":
-                ref[(l["setor"], l["subtipo"])].add(l["PREÇO"])
+            if l["status"] == "casado" and l["regime"] == "mercado" and l["categoria"] in ref:
+                ref[l["categoria"]][(l["setor"], l["subtipo"])].add(l["PREÇO"])
         for l in linhas:
             if l["regime"] != "mercado" or "PREÇO" not in l:
                 continue
-            r = ref.get((l["setor"], l["subtipo"]), set())
-            if len(r) != 1 or next(iter(r)) == 0:
-                continue
-            inteira = next(iter(r))
-            obs[l["categoria"]].append((l["PREÇO"] / inteira, l["VENDIDOS"],
-                                        abs(l["PREÇO"] - inteira / 2) <= Decimal("0.01")))
+            for base in ("Inteira", "Meia"):
+                r = ref[base].get((l["setor"], l["subtipo"]), set())
+                if len(r) != 1 or next(iter(r)) == 0:
+                    continue
+                preco_ref = next(iter(r))
+                obs[base][l["categoria"]].append(
+                    (l["PREÇO"] / preco_ref, l["VENDIDOS"],
+                     abs(l["PREÇO"] - preco_ref / 2) <= Decimal("0.01")))
     tabela = []
-    for cat, v in sorted(obs.items(), key=lambda x: -len(x[1])):
+    for cat, v in sorted(obs["Inteira"].items(), key=lambda x: -len(x[1])):
         razoes = [x[0] for x in v]
+        m = [x[0] for x in obs["Meia"].get(cat, [])]
         tabela.append({
             "categoria": cat, "observacoes": len(v), "ingressos": sum(x[1] for x in v),
             "pct_exatamente_metade": f"{100 * sum(x[2] for x in v) / len(v):.1f}",
             "razao_mediana": f"{median(razoes):.4f}", "razao_minima": f"{min(razoes):.4f}",
-            "razao_maxima": f"{max(razoes):.4f}"})
+            "razao_maxima": f"{max(razoes):.4f}",
+            "observacoes_sobre_meia": len(m),
+            "razao_meia_mediana": f"{median(m):.4f}" if m else "",
+            "razao_meia_minima": f"{min(m):.4f}" if m else "",
+            "razao_meia_maxima": f"{max(m):.4f}" if m else ""})
     return tabela
 
 

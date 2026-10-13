@@ -341,18 +341,18 @@ class TestBaseFechada(unittest.TestCase):
 
     def test_2_preco_regulado_por_categoria(self):
         esperado = {"Meia": True, "Meia Promocional": True, "PCR": True, "Menor": True,
-                    "Acompanhante": True, "Solidário": True,
-                    "Inteira": False, "Meia Social": False}
+                    "Acompanhante": True, "Solidário": True, "Meia Social": True,
+                    "Meia Solidária": True, "Inteira": False}
         for categoria, regulado in esperado.items():
             with self.subTest(categoria=categoria):
                 r = self.sep(f"SETOR A - {categoria}", "10.00")
                 self.assertEqual(r["categoria"], categoria)
                 self.assertIs(r["preco_regulado"], regulado)
 
-    def test_2_so_inteira_e_meias_sociais_ficam_livres_em_mercado(self):
+    def test_2_so_inteira_fica_livre_em_mercado(self):
         livres = {l["categoria_boletim"] for l in self.refs["literais"].values()
                   if l["regime"] == "mercado" and l["preco_regulado"] == "nao"}
-        self.assertEqual(livres, {"Inteira", "Meia Social", "Meia Solidária"})
+        self.assertEqual(livres, {"Inteira"})
 
     def test_4_linha_fecha_exata_sem_preco_derivado(self):
         l = {"VENDIDOS": Decimal("10"), "PREÇO": Decimal("20.00"),
