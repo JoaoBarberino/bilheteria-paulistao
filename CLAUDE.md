@@ -75,6 +75,16 @@ deve ser reportado como tal.
 - Prosa direta, frases curtas. Sem travessão. Sem linguagem promocional.
 - Gráfico sem rótulo de eixo e sem unidade não entra.
 
+## Fluxo de trabalho
+
+- Ao terminar uma tarefa, você mesmo faz o push da branch, abre o pull
+  request e faz o merge, usando o gh CLI. Não peça para eu fazer.
+- Se o gh não estiver instalado ou autenticado, diga isso e pare, não
+  tente contornar.
+- Depois do merge, volte para a main, dê pull e me diga em que commit
+  ficou.
+- Nunca faça push direto na main.
+
 ## Postura
 
 Aponte erro meu quando encontrar, incluindo erro metodológico no que já está

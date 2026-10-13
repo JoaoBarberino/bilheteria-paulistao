@@ -370,5 +370,35 @@ class TestBaseFechada(unittest.TestCase):
         self.assertFalse(lote.linha_fecha(l))
 
 
+class TestPadronizacaoNoCSV(unittest.TestCase):
+    """O CSV processado só pode ter clube e estádio que estão nos dicionários."""
+
+    @classmethod
+    def setUpClass(cls):
+        import csv
+        with open(RAIZ / "data" / "03_processed" / "boletins.csv", encoding="utf-8", newline="") as f:
+            cls.linhas = list(csv.DictReader(f))
+        cls.clubes, cls.estadios = lote.carregar_padronizacao()
+
+    def test_clubes_no_dicionario(self):
+        padronizados = set(self.clubes.values())
+        for papel in ("mandante", "visitante"):
+            with self.subTest(papel=papel):
+                self.assertEqual({l[f"{papel}_boletim"] for l in self.linhas} - set(self.clubes), set())
+                self.assertEqual({l[papel] for l in self.linhas} - padronizados, set())
+
+    def test_estadios_no_dicionario(self):
+        self.assertEqual({l["estadio_boletim"] for l in self.linhas} - set(self.estadios), set())
+        padronizados = {e["estadio"] for e in self.estadios.values()}
+        self.assertEqual({l["estadio"] for l in self.linhas} - padronizados, set())
+
+    def test_padronizar_lista_nome_desconhecido(self):
+        r = [{"mandante_boletim": "Clube X", "visitante_boletim": "Santos",
+              "estadio_boletim": "Estádio Y"}]
+        sem = lote.padronizar(r, self.clubes, self.estadios)
+        self.assertEqual(sem, {"clube": {"Clube X"}, "estadio": {"Estádio Y"}})
+        self.assertEqual((r[0]["mandante"], r[0]["visitante"], r[0]["estadio"]), ("", "Santos", ""))
+
+
 if __name__ == "__main__":
     unittest.main()
