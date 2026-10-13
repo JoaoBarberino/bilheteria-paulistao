@@ -91,13 +91,17 @@ class TestFixtures(unittest.TestCase):
         r = parser.processar(FIXTURES / "2024_52.pdf", parser.carregar_categorias())
         self.assertEqual(r["descartadas"], 9)
 
-    def test_pcd_nao_vira_inteira(self):
+    def test_pcd_e_especial_sao_subtipo_no_fixture(self):
         r = parser.processar(FIXTURES / "2023_55.pdf", parser.carregar_categorias())
         pcd = [l for l in r["linhas"] if "P.C.D." in l["rotulo"]]
         self.assertTrue(pcd)
         for l in pcd:
-            self.assertEqual(l["categoria"], "P.C.D.")
-            self.assertEqual(l["regime"], "mercado")
+            self.assertEqual((l["subtipo"], l["categoria"], l["regime"]),
+                             ("P.C.D.", "Inteira", "mercado"))
+        esp = [l for l in r["linhas"] if l["rotulo"] == "CAMAROTES 4º ANDAR - Especial - Meia"]
+        self.assertEqual(len(esp), 1)
+        self.assertEqual((esp[0]["setor"], esp[0]["subtipo"], esp[0]["categoria"], esp[0]["regime"]),
+                         ("CAMAROTES 4º ANDAR", "Especial", "Meia", "mercado"))
 
 
 class TestClassificacao(unittest.TestCase):
@@ -138,6 +142,84 @@ class TestClassificacao(unittest.TestCase):
         parser.derivar_preco(r)
         self.assertTrue(r["preco_derivado"])
         self.assertEqual(r["PREÇO"], Decimal("34.76"))
+
+
+class TestDecisoesRegime(unittest.TestCase):
+    """Itens 1 a 7 das decisões de regime."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.refs = parser.carregar_categorias()
+
+    def sep(self, rotulo, preco=None):
+        return parser.separar_setor_categoria(rotulo, self.refs, preco)
+
+    def test_1_tc10_socio_sem_colapsar(self):
+        for rotulo, original in [
+                ("ARQUIBANCADA - TC10 ARQUIBANCADA", "TC10 ARQUIBANCADA"),
+                ("CADEIRA VITALÍCIA - TC10 VITALÍCIA - ADICIONAL", "TC10 VITALÍCIA - ADICIONAL")]:
+            r = self.sep(rotulo)
+            self.assertEqual((r["categoria"], r["regime"], r["categoria_boletim"]),
+                             ("TC10", "socio", original))
+
+    def test_2_palmeiras_pay_promocional(self):
+        r = self.sep("C - AMARELO SUPERIOR - - - Palmeiras Pay")
+        self.assertEqual((r["setor"], r["categoria"], r["regime"]),
+                         ("C - AMARELO SUPERIOR", "Palmeiras Pay", "promocional"))
+
+    def test_3_unico_contrato(self):
+        r = self.sep("CAMAROTE TÉRREO OESTE - CORPORATIVO - Único")
+        self.assertEqual((r["setor"], r["categoria"], r["regime"]),
+                         ("CAMAROTE TÉRREO OESTE - CORPORATIVO", "Único", "contrato"))
+
+    def test_4_camarote_contrato(self):
+        r = self.sep("CAMAROTES SETOR 4 - Camarote")
+        self.assertEqual((r["setor"], r["categoria"], r["regime"]),
+                         ("CAMAROTES SETOR 4", "Camarote", "contrato"))
+
+    def test_5_pcd_com_categoria_e_subtipo(self):
+        for rotulo, cat in [("GOL SUL - P.C.D. - Inteira", "Inteira"),
+                            ("GOL SUL - P.C.D. - Meia", "Meia"),
+                            ("GOL SUL - P.C.D. - Acompanhante", "Acompanhante")]:
+            r = self.sep(rotulo)
+            self.assertEqual((r["setor"], r["subtipo"], r["categoria"], r["regime"]),
+                             ("GOL SUL", "P.C.D.", cat, "mercado"))
+
+    def _linhas_pcd(self, preco_pcd):
+        linhas = []
+        for rotulo, preco in [("SETOR A - Inteira", "100.00"), ("SETOR A - Meia", "50.00"),
+                              ("SETOR A - P.C.D.", preco_pcd)]:
+            r = {"rotulo": rotulo, "PREÇO": Decimal(preco)}
+            r.update(self.sep(rotulo, r["PREÇO"]))
+            linhas.append(r)
+        parser.resolver_pcd(linhas)
+        return linhas[-1]
+
+    def test_5_pcd_sozinho_pela_aritmetica(self):
+        r = self._linhas_pcd("100.00")
+        self.assertEqual((r["subtipo"], r["categoria"], r["pcd_decisao"]), ("P.C.D.", "Inteira", "inteira"))
+        r = self._linhas_pcd("50.00")
+        self.assertEqual((r["subtipo"], r["categoria"], r["pcd_decisao"]), ("P.C.D.", "Meia", "meia"))
+        r = self._linhas_pcd("30.00")
+        self.assertEqual((r["status"], r["categoria"], r["pcd_decisao"]), ("revisao_pcd", None, "revisao"))
+
+    def test_5_pcd_sozinho_sem_inteira_vai_para_revisao(self):
+        r = {"rotulo": "SETOR B - P.C.D.", "PREÇO": Decimal("50.00")}
+        r.update(self.sep(r["rotulo"], r["PREÇO"]))
+        parser.resolver_pcd([r])
+        self.assertEqual(r["status"], "revisao_pcd")
+
+    def test_6_especial_sempre_subtipo(self):
+        for rotulo, cat in [("CAMAROTES 4º ANDAR - Especial - Meia", "Meia"),
+                            ("TOBOGÃ - Especial - Inteira", "Inteira")]:
+            r = self.sep(rotulo)
+            self.assertEqual((r["subtipo"], r["categoria"], r["regime"]), ("Especial", cat, "mercado"))
+        self.assertNotIn("Especial", self.refs["literais"])
+
+    def test_7_menor_mercado(self):
+        r = self.sep("ARQUIBANCADA - Promoção - Menor")
+        self.assertEqual((r["setor"], r["subtipo"], r["categoria"], r["regime"]),
+                         ("ARQUIBANCADA", "Promoção", "Menor", "mercado"))
 
 
 if __name__ == "__main__":

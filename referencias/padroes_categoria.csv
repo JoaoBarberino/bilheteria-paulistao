@@ -6,6 +6,7 @@ Sócio Diamante,Sócio,socio,nao
 Sócio Platinum,Sócio,socio,nao
 Proprietário.*,Proprietário,contrato,nao
 Smart .+,Smart,contrato,nao
+TC10 .+,TC10,socio,nao
 [^-]*Corporativo,Corporativo,contrato,nao
 (?i:lei)\b.*,Gratuidade legal,gratuidade,sim
 (?i:decreto)\b.*,Gratuidade legal,gratuidade,sim

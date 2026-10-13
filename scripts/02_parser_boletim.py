@@ -19,6 +19,11 @@ Entre setor e categoria pode haver um subtipo (faixa de produto, como
 regime próprio, o regime segue o subtipo; senão segue a categoria. Um
 segmento em caixa mista que não seja subtipo conhecido manda a linha para
 revisão. Rótulo sem categoria também vai para revisão, nunca para chute.
+P.C.D. é sempre subtipo. Sozinho no fim do rótulo, vira Inteira ou Meia
+pela comparação com a Inteira do mesmo setor no mesmo jogo, ou revisão.
+
+Detector preco_quebrado: preço com centavos diferentes de 00, fora os
+derivados. Só marca, não reclassifica.
 
 Rótulos quebrados em duas linhas ("... - Carnê de" / números /
 "Relacionamento") são juntados. Linhas vazias do formulário (sem rótulo,
@@ -50,7 +55,8 @@ RODAPE = "Federação Paulista de Futebol"
 # Detector de casamento parcial. Não usa str.islower: "º" conta como
 # minúscula e aparece em setores ("CAMAROTES 3º ANDAR").
 MINUSCULA = re.compile(r"[a-zà-öø-ÿ]")
-MARCADORES_CATEGORIA = {"P.C.D."}
+SUBTIPO_PCD = "P.C.D."
+MARCADORES_CATEGORIA = {SUBTIPO_PCD}
 
 COLUNAS = ["A VENDA", "DEVOLVIDOS", "VENDIDOS", "PREÇO", "ARRECADAÇÃO"]
 
@@ -187,12 +193,20 @@ def separar_setor_categoria(rotulo, refs, preco=None):
     """Separa o rótulo em setor, subtipo e categoria.
 
     Devolve dict com setor, subtipo, categoria, categoria_boletim, regime,
-    rotulo_avanti e status: "casado", "sem_categoria", "subtipo_desconhecido"
-    ou "revisao_preco" (padrão com guarda e preço acima de zero).
+    rotulo_avanti e status: "casado", "sem_categoria", "subtipo_desconhecido",
+    "revisao_preco" (gratuidade com preço acima de zero) ou "pcd_sozinho"
+    (resolvido depois por resolver_pcd).
     """
     vazio = {"setor": None, "subtipo": None, "categoria": None, "categoria_boletim": None,
              "regime": None, "rotulo_avanti": None}
     segs = segmentos(rotulo)
+    # P.C.D. é condição do comprador, sempre subtipo. Sozinho no fim do
+    # rótulo, a categoria sai da aritmética do boletim (resolver_pcd).
+    if len(segs) >= 2 and segs[-1] == SUBTIPO_PCD:
+        if setor_suspeito(segs[:-1]):
+            return {**vazio, "status": "subtipo_desconhecido"}
+        return {**vazio, "setor": " - ".join(segs[:-1]), "subtipo": SUBTIPO_PCD,
+                "categoria_boletim": SUBTIPO_PCD, "status": "pcd_sozinho"}
     for i in range(1, len(segs)):
         cat = casar_categoria(" - ".join(segs[i:]), refs)
         if cat:
@@ -283,6 +297,44 @@ def derivar_preco(r):
         r["preco_derivado"] = True
 
 
+def resolver_pcd(linhas_tab):
+    """P.C.D. sozinho: categoria pela aritmética do próprio boletim.
+
+    Compara o preço com a Inteira (sem subtipo) do mesmo setor no mesmo
+    jogo. Igual: Inteira. Exatamente metade: Meia. Qualquer outro caso, ou
+    setor sem uma única Inteira: revisão ("revisao_pcd"). Grava a decisão
+    em pcd_decisao.
+    """
+    inteiras = {}
+    for r in linhas_tab:
+        if r["status"] == "casado" and r["categoria"] == "Inteira" and not r["subtipo"]:
+            inteiras.setdefault(r["setor"], set()).add(r.get("PREÇO"))
+    for r in linhas_tab:
+        r["pcd_decisao"] = None
+        if r["status"] != "pcd_sozinho":
+            continue
+        ref = inteiras.get(r["setor"], set())
+        preco = r.get("PREÇO")
+        if len(ref) == 1 and preco is not None:
+            inteira = next(iter(ref))
+            if preco == inteira:
+                r.update(categoria="Inteira", regime="mercado", status="casado", pcd_decisao="inteira")
+                continue
+            if preco * 2 == inteira:
+                r.update(categoria="Meia", regime="mercado", status="casado", pcd_decisao="meia")
+                continue
+        r.update(setor=None, subtipo=None, categoria_boletim=None, status="revisao_pcd",
+                 pcd_decisao="revisao")
+
+
+def marcar_preco_quebrado(r):
+    """Detector, sem ação: preço com centavos diferentes de 00 que não foi
+    derivado. Preço de mercado costuma ser redondo."""
+    preco = r.get("PREÇO")
+    r["preco_quebrado"] = (not r["preco_derivado"] and preco is not None
+                           and preco != preco.to_integral_value())
+
+
 def extrair_tabela(paginas, refs):
     """paginas: lista de linhas por página. Lê da linha LOCALIDADES da
     primeira página até TOTAIS, atravessando quebras de página. As páginas
@@ -327,7 +379,9 @@ def extrair_tabela(paginas, refs):
             continue
         registro.update(separar_setor_categoria(registro["rotulo"], refs, registro.get("PREÇO")))
         derivar_preco(registro)
+        marcar_preco_quebrado(registro)
         linhas_tab.append(registro)
+    resolver_pcd(linhas_tab)
     return linhas_tab, totais, margem, descartadas
 
 
