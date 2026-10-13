@@ -1,8 +1,6 @@
 categoria_boletim,categoria,regime,rotulo_avanti
 Inteira,Inteira,mercado,
 Meia,Meia,mercado,
-Visitante - Inteira,Visitante - Inteira,mercado,
-Visitante - Meia,Visitante - Meia,mercado,
 PCR,PCR,mercado,
 "Lei nº18.159- Meia entrada, menores de 12 anos",Meia legal,mercado,
 Meia Social,Meia Social,mercado,
@@ -24,10 +22,6 @@ Avanti - 75% Desconto,Avanti,socio,75% Desconto
 Avanti - 100% Desconto,Avanti,socio,100% Desconto
 Carnê de Relacionamento,Carnê de Relacionamento,contrato,
 Carnê Superficiária,Carnê Superficiária,contrato,
-Carnê Cadeira Cativa - Inteira,Carnê Cadeira Cativa,contrato,
-Carnê Cadeira Cativa - Meia,Carnê Cadeira Cativa,contrato,
-Cativa - Inteira,Cativa,contrato,
-Cativa - Meia,Cativa,contrato,
 Cadeira Vitalícia,Cadeira Vitalícia,contrato,
 Proprietário Black,Proprietário,contrato,
 Proprietário Gold,Proprietário,contrato,

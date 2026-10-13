@@ -13,22 +13,25 @@ formulário são descartadas.
 | boletim, mandante, visitante, data, horario, estadio, cidade, uf, competicao | Cabeçalho do boletim |
 | rotulo | Texto da coluna LOCALIDADES como sai do PDF, com rótulos quebrados em duas linhas já juntados |
 | setor | Parte do rótulo antes do subtipo e da categoria |
-| subtipo | Faixa de produto ou condição do comprador entre setor e categoria (ex.: Geral, Carnê, P.C.D.). Vazio quando não há |
+| subtipo | Faixa de produto ou condição do comprador entre setor e categoria (ex.: Geral, Carnê, Cativa, Visitante, P.C.D.). Vazio quando não há |
 | categoria | Categoria padronizada |
 | categoria_boletim | Texto original da categoria no boletim. Para TC10 guarda o plano (`TC10 VIP`, `TC10 JUNIOR`, ...) |
 | regime | mercado, socio, contrato, promocional, gratuidade ou nao_vendido |
 | rotulo_avanti | Nome da faixa Avanti (ex.: "50% Desconto"). É rótulo, não desconto praticado |
-| status | casado, sem_categoria, subtipo_desconhecido, revisao_preco ou revisao_pcd |
+| status | casado, sem_categoria, subtipo_desconhecido, revisao_preco, revisao_pcd ou revisao_meia |
 | a_venda, devolvidos, vendidos | Quantidades do boletim |
 | preco | Preço unitário impresso no boletim, ou derivado (ver preco_derivado) |
 | preco_derivado | Verdadeiro quando o boletim imprime R$ 0,00 com arrecadação positiva (Fiel Torcedor). Nesse caso preco = arrecadação / vendidos, arredondado a centavos. É preço médio da linha, não preço de tabela |
 | preco_quebrado | Detector: preço com centavos diferentes de 00, fora os derivados. Só marca; nada é reclassificado por causa dele |
+| preco_regulado | Verdadeiro para categoria Meia e para subtipo P.C.D. O preço vem de obrigação legal ou de acessibilidade, não de decisão comercial do clube |
+| meia_fora_da_metade | Só para categoria Meia. Verdadeiro quando o preço difere em mais de R$ 0,01 da metade da Inteira de mercado do mesmo setor e mesmo subtipo (sem ela, da Inteira do setor sem subtipo). Falso quando bate. Vazio quando não há essa Inteira no jogo |
 | arrecadacao | Arrecadação da linha |
 | linha_fecha | vendidos x preço = arrecadação. Falso quando o preço é derivado |
 | totais_conferem | A soma das linhas do boletim bate com a linha TOTAIS |
 
-Linhas com status diferente de `casado` estão em revisão: setor,
-categoria e regime ficam vazios. A classificação usa os arquivos em
+Linhas com status diferente de `casado` estão em revisão e sem regime.
+Em `revisao_meia`, setor, subtipo e categoria são mantidos para
+conferência; nos demais status ficam vazios. A classificação usa os arquivos em
 `referencias/`.
 
 `preco` não é preço médio realizado do jogo. Preço médio realizado é
@@ -49,9 +52,10 @@ renda bruta ÷ público pagante e é calculado depois, a partir desta base.
 contrato, promocional, gratuidade e nao_vendido.
 
 Quando o subtipo indica produto contratual ou de associação (Carnê,
-Sócio, ST, TC10, Avanti, Proprietário, Vitalícia, Smart), o regime segue o
-subtipo. Nos demais subtipos (Geral, Especial, Promoção, Portão 22,
-P.C.D., Camarote dos Ídolos), o regime segue a categoria.
+Sócio, ST, TC10, Avanti, Proprietário, Vitalícia, Smart, Cativa, Carnê
+Cadeira Cativa), o regime segue o subtipo. Nos demais subtipos (Geral,
+Especial, Promoção, Portão 22, P.C.D., Camarote dos Ídolos, Visitante), o
+regime segue a categoria.
 
 ### Decisões e motivos
 
@@ -78,6 +82,19 @@ P.C.D., Camarote dos Ídolos), o regime segue a categoria.
   metade, revisão em qualquer outro caso. "P.C.D. - Acompanhante" vira
   subtipo P.C.D. e categoria Acompanhante.
 - **Especial é sempre subtipo**, pelo mesmo motivo.
+- **Visitante, Cativa e Carnê Cadeira Cativa são subtipo.** Nenhuma
+  categoria do dicionário termina em Meia ou Inteira; o que vem antes é
+  subtipo. Visitante é condição do comprador; Cativa e Carnê Cadeira
+  Cativa são produtos contratuais, com regime contrato.
+- **Meia-entrada é metade da Inteira, por lei.** Meia de regime mercado
+  fora da metade sai de mercado e vai para revisão (`revisao_meia`).
+  Exceção: subtipo P.C.D., que fica em mercado com `preco_regulado`
+  verdadeiro, porque é preço de acessibilidade, não erro. Caso das três
+  linhas P.C.D. - Meia do Palmeiras (R$ 30 sobre Inteira de R$ 90, R$ 40
+  sobre R$ 120, R$ 30 sobre R$ 80).
+- **"Especial - Meia" não é mais literal do dicionário.** Tinha sido posto
+  a partir de um caso só (2023_55, R$ 50,43). Esse caso é 0,84 da Inteira
+  do setor (R$ 60) e agora está em revisão.
 - **Menor, regime mercado.** Duas linhas, `ARQUIBANCADA - Promoção - Menor`.
 
 ## Lacuna conhecida
@@ -87,10 +104,25 @@ embaralhado (`VEN A DADEVOLVIDOS...`) e a linha TOTAIS não traz a
 arrecadação, então o parser não consegue validar o jogo. Os números não
 foram digitados à mão. A base tem 388 dos 389 jogos.
 
-## Inconsistência conhecida da FPF
+## Inconsistências conhecidas
 
 **2024_40, Inter Limeira x São Paulo, 28/02/2024, Arena BRB.** Sete linhas
 com categoria `Gratuidade` têm preço impresso de R$ 89 a R$ 219 e
 arrecadação positiva, R$ 212.586 no total (0,075% da receita da base). O
-rótulo e o preço se contradizem, e a contradição é da fonte. As linhas
-ficam em revisão (`status = revisao_preco`), sem regime.
+rótulo e o preço se contradizem, e a contradição é da fonte. No setor
+CADEIRA HOSPITALITY OESTE, a Gratuidade custa R$ 219, exatamente o preço
+modal da Meia Social do mesmo setor no mesmo jogo (246 ingressos). O mesmo
+vale para outros cinco setores do jogo: em cada um, o preço da
+"Gratuidade" é igual ao da Meia Social do setor (R$ 131, 109, 153, 98 e
+89). O sétimo, N3 - CAMAROTES VIP E VVIP, não tem Meia Social.
+Hipótese: erro de preenchimento do formulário da FPF. **Hipótese
+documentada, não aplicada.** As linhas permanecem em revisão
+(`status = revisao_preco`), sem regime.
+
+**2023_2, ARQUIBANCADA - Promoção - Menor a R$ 60,00**, idêntico à Inteira
+do setor. O rótulo diz promoção e o preço não tem desconto. 301
+ingressos, mantidos em mercado.
+
+**2024_44, ARQUIBANCADA NORTE OREO - Meia a R$ 20 sobre Inteira de R$ 30.**
+Setor patrocinado, preço fora da metade legal. 1.831 ingressos, em
+revisão (`status = revisao_meia`).
