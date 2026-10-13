@@ -130,10 +130,28 @@ se sobrepõem.
 
 Retirar setores com poucas observações não muda o resultado. Retirar as
 unidades possivelmente esgotadas torna o beta mais negativo, como se espera
-de censura por capacidade, e o intervalo atravessa -1. Placebo: com o preço
-embaralhado dentro de cada jogo, 60 vezes (semente 20261013), o beta médio
-fica em -0,001 sem o filtro de ocupação e em +0,001 com ele, e o filtro
-desloca o beta em +0,002. O filtro, sozinho, não produz o resultado.
+de censura por capacidade, e o intervalo atravessa -1.
+
+Recortes por grupo de mandante:
+
+| Recorte de E2 | beta | Erro padrão | IC 95% | Obs. | Jogos | Setores |
+|---|---|---|---|---|---|---|
+| Completa | -0,468 | 0,212 | [-0,883; -0,053] | 2.212 | 387 | 337 |
+| Sem São Paulo, Palmeiras, Santos e Corinthians | -0,647 | 0,245 | [-1,128; -0,165] | 1.094 | 277 | 182 |
+| Só esses quatro | -0,231 | 0,372 | [-0,960; 0,499] | 1.118 | 110 | 155 |
+
+Sem os quatro grandes, o beta fica mais negativo e o intervalo continua
+excluindo zero. Só com eles, o intervalo atravessa zero. Os intervalos dos
+dois grupos se sobrepõem (ver Limitação 5).
+
+Placebo do filtro de censura: com o preço embaralhado dentro de cada jogo,
+60 vezes (semente 20261013), o beta médio fica em -0,001 sem o filtro de
+ocupação (desvio-padrão de 0,055 entre as repetições) e em +0,001 com ele
+(desvio-padrão de 0,051). O filtro desloca o beta médio em +0,002, muito
+menos que a dispersão de uma repetição para outra. O filtro, sozinho, não
+produz o resultado. Esse desvio-padrão não é medida de incerteza
+alternativa: o embaralhamento destrói a dependência dentro do jogo que o
+erro agrupado contabiliza, e o intervalo que vale é o agrupado.
 
 ![Resíduo contra valor ajustado de E2](figuras/05_modelo/residuo_ajustado_E2.png)
 
@@ -188,15 +206,22 @@ resolve a censura.
 
 **4. Parte pequena da base identifica o modelo.** O subconjunto
 identificador (regime mercado, preço não regulado) são 2.290 das 12.241
-linhas. O regime mercado é 43,4% dos ingressos da base (2.094.607 de
+linhas. O regime mercado é 43,4% dos ingressos da base (2.094.600 de
 4.821.229). Sócio é 41,8%, contrato 11,0%, gratuidade 2,0%, não vendido
 1,7% e promocional 0,1%. A elasticidade vale para o público de mercado,
 não para o sócio-torcedor nem para o contrato de longo prazo.
 
 **5. Concentração.** São Paulo, Palmeiras, Santos e Corinthians somam
 50,5% das unidades da estimação (1.118 de 2.212 setor-jogos) e 58,0% dos
-ingressos de mercado dessas unidades, em 110 dos 387 jogos. O beta médio
-é muito influenciado por esses quatro clubes.
+ingressos de mercado dessas unidades, em 110 dos 387 jogos. O resultado
+não é puxado por esses quatro clubes. Sem eles, o beta é -0,647, com IC
+95% de -1,128 a -0,165 (1.094 setor-jogos, 277 jogos, 182 setores). Só com
+eles, o beta é -0,231, com IC 95% de -0,960 a +0,499 (1.118 setor-jogos,
+110 jogos, 155 setores), e o intervalo atravessa zero. Os dois intervalos
+se sobrepõem, então não dá para afirmar que os grupos diferem.
+*Hipótese, não testada:* clube grande esgota setor com mais frequência, e
+a censura puxa o beta para zero (Limitação 3), o que explicaria um beta
+menor em módulo entre os quatro grandes.
 
 **6. Anomalia de composição em 2025.** O público de mercado por jogo cai
 de 6.043 em 2024 para 3.928 em 2025 e volta a 5.402 em 2026. Ao ritmo de
@@ -249,3 +274,37 @@ que o clube cobra pouco.
 | `notebooks/` | Descritiva (04), modelo (05) e receita (06) |
 | `figuras/` | Gráficos gerados pelos notebooks |
 | `tests/` | Testes de regressão do parser e do lote |
+| `requirements.txt` | Pacotes e versões usados |
+
+## Como reproduzir
+
+Python 3.12.7. Instale as dependências:
+
+```
+python -m pip install -r requirements.txt
+```
+
+Na raiz do repositório, rode na ordem:
+
+```
+python scripts/01_coleta_boletins.py
+python scripts/03_lote_boletins.py
+python -m unittest discover tests
+```
+
+1. `01_coleta_boletins.py` baixa os 389 boletins da FPF para
+   `data/01_raw/{ano}/`. Precisa de rede. Os PDFs não estão no repositório.
+   A coleta espera 1 segundo entre requisições (opção `--intervalo`), pula
+   o que já está em disco e registra falhas sem interromper.
+2. `03_lote_boletins.py` roda o parser em todos os boletins, grava
+   `data/03_processed/boletins.csv` e `referencias/razao_categoria_inteira.csv`
+   e imprime o relatório do lote.
+3. Os testes conferem o gabarito de 2026_72, os fixtures em
+   `tests/fixtures/` e a padronização do CSV.
+4. Depois, abra e execute os notebooks em ordem, num ambiente Jupyter:
+   `notebooks/04_descritiva.ipynb`, `05_modelo.ipynb` e `06_receita.ipynb`.
+   Os gráficos são gravados em `figuras/`. O Jupyter não está em
+   `requirements.txt`, que lista só os pacotes que o código importa.
+
+`scripts/02_parser_boletim.py` também roda sozinho sobre um boletim, para
+inspeção: `python scripts/02_parser_boletim.py data/01_raw/2026/2026_72.pdf`.
