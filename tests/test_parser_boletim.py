@@ -18,6 +18,11 @@ _spec = importlib.util.spec_from_file_location(
 parser = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(parser)
 
+_spec_lote = importlib.util.spec_from_file_location(
+    "lote_boletins", RAIZ / "scripts" / "03_lote_boletins.py")
+lote = importlib.util.module_from_spec(_spec_lote)
+_spec_lote.loader.exec_module(lote)
+
 # Gabarito lido à mão do boletim 72/2026, Grêmio Novorizontino x Palmeiras,
 # 08/03/2026: (setor, categoria, vendidos, preço, arrecadação).
 GABARITO_2026_72 = [
@@ -303,6 +308,66 @@ class TestMeiaRegulada(unittest.TestCase):
             with self.subTest(literal=literal):
                 self.assertNotIn(ultimo, ("Meia", "Inteira"))
         self.assertNotIn("Especial - Meia", self.refs["literais"])
+
+
+class TestBaseFechada(unittest.TestCase):
+    """Itens 1, 2 e 4 da última rodada antes da descritiva."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.refs = parser.carregar_categorias()
+
+    def sep(self, rotulo, preco):
+        r = {"rotulo": rotulo, "PREÇO": Decimal(preco)}
+        r.update(parser.separar_setor_categoria(rotulo, self.refs, r["PREÇO"]))
+        parser.marcar_meia([r])
+        return r
+
+    def test_1_lei_com_preco_zero_vira_gratuidade(self):
+        r = self.sep("ARQUIBANCADA MANDANTE - SEÇÃO 2 - Lei nº18.159- Meia entrada, menores de 12 anos",
+                     "0.00")
+        self.assertEqual((r["categoria"], r["regime"], r["lei_preco_zero"], r["preco_regulado"]),
+                         ("Meia legal", "gratuidade", True, False))
+
+    def test_1_lei_com_preco_fica_mercado_regulado(self):
+        r = self.sep("ARQUIBANCADA - Lei nº18.159- Meia entrada, menores de 12 anos", "30.00")
+        self.assertEqual((r["regime"], r["lei_preco_zero"], r["preco_regulado"]),
+                         ("mercado", False, True))
+
+    def test_1_gratuidade_legal_com_preco_zero_nao_muda(self):
+        r = self.sep("ARQUIBANCADA - Lei n. 4046/14 - Novorizonte", "0.00")
+        self.assertEqual((r["categoria"], r["regime"], r["lei_preco_zero"]),
+                         ("Gratuidade legal", "gratuidade", False))
+
+    def test_2_preco_regulado_por_categoria(self):
+        esperado = {"Meia": True, "Meia Promocional": True, "PCR": True, "Menor": True,
+                    "Acompanhante": True, "Solidário": True,
+                    "Inteira": False, "Meia Social": False}
+        for categoria, regulado in esperado.items():
+            with self.subTest(categoria=categoria):
+                r = self.sep(f"SETOR A - {categoria}", "10.00")
+                self.assertEqual(r["categoria"], categoria)
+                self.assertIs(r["preco_regulado"], regulado)
+
+    def test_2_so_inteira_e_meias_sociais_ficam_livres_em_mercado(self):
+        livres = {l["categoria_boletim"] for l in self.refs["literais"].values()
+                  if l["regime"] == "mercado" and l["preco_regulado"] == "nao"}
+        self.assertEqual(livres, {"Inteira", "Meia Social", "Meia Solidária"})
+
+    def test_4_linha_fecha_exata_sem_preco_derivado(self):
+        l = {"VENDIDOS": Decimal("10"), "PREÇO": Decimal("20.00"),
+             "ARRECADAÇÃO": Decimal("200.01"), "preco_derivado": False}
+        self.assertFalse(lote.linha_fecha(l))
+        l["ARRECADAÇÃO"] = Decimal("200.00")
+        self.assertTrue(lote.linha_fecha(l))
+
+    def test_4_linha_fecha_com_tolerancia_no_preco_derivado(self):
+        l = {"categoria_boletim": "Fiel Torcedor", "VENDIDOS": Decimal("8109"),
+             "PREÇO": Decimal("0.00"), "ARRECADAÇÃO": Decimal("281873.00")}
+        parser.derivar_preco(l)
+        self.assertTrue(lote.linha_fecha(l))
+        l["ARRECADAÇÃO"] = Decimal("300000.00")
+        self.assertFalse(lote.linha_fecha(l))
 
 
 if __name__ == "__main__":

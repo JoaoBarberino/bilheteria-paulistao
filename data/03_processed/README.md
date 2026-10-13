@@ -23,10 +23,10 @@ formulário são descartadas.
 | preco | Preço unitário impresso no boletim, ou derivado (ver preco_derivado) |
 | preco_derivado | Verdadeiro quando o boletim imprime R$ 0,00 com arrecadação positiva (Fiel Torcedor). Nesse caso preco = arrecadação / vendidos, arredondado a centavos. É preço médio da linha, não preço de tabela |
 | preco_quebrado | Detector: preço com centavos diferentes de 00, fora os derivados. Só marca; nada é reclassificado por causa dele |
-| preco_regulado | Verdadeiro para categoria Meia e para subtipo P.C.D. O preço vem de obrigação legal ou de acessibilidade, não de decisão comercial do clube |
+| preco_regulado | Verdadeiro quando o preço é fração fixa da Inteira ou vem de obrigação legal ou de acessibilidade: categorias marcadas no dicionário (Meia, Meia Promocional, PCR, Menor, Meia legal, Acompanhante, Solidário), categoria de lei com preço acima de zero e subtipo P.C.D. Ver "Preço regulado" abaixo |
 | meia_fora_da_metade | Só para categoria Meia. Verdadeiro quando o preço difere em mais de R$ 0,01 da metade da Inteira de mercado do mesmo setor e mesmo subtipo (sem ela, da Inteira do setor sem subtipo). Falso quando bate. Vazio quando não há essa Inteira no jogo |
 | arrecadacao | Arrecadação da linha |
-| linha_fecha | vendidos x preço = arrecadação. Falso quando o preço é derivado |
+| linha_fecha | vendidos x preço = arrecadação. Comparação exata para preço impresso; para preço derivado, tolerância de vendidos x 0,005, por causa do arredondamento a centavos |
 | totais_conferem | A soma das linhas do boletim bate com a linha TOTAIS |
 
 Linhas com status diferente de `casado` estão em revisão e sem regime.
@@ -96,6 +96,51 @@ regime segue a categoria.
   a partir de um caso só (2023_55, R$ 50,43). Esse caso é 0,84 da Inteira
   do setor (R$ 60) e agora está em revisão.
 - **Menor, regime mercado.** Duas linhas, `ARQUIBANCADA - Promoção - Menor`.
+
+## Preço regulado
+
+No regime mercado, só Inteira, Meia Social e Meia Solidária ficam com
+`preco_regulado` falso. As demais categorias de mercado são a Inteira
+multiplicada por uma constante: não contêm variação de preço própria, e
+incluí-las no modelo mediria desconto legal em vez de comportamento.
+
+A evidência é medida na base, não suposta: a razão entre o preço de cada
+categoria e a Inteira do mesmo setor, mesmo subtipo e mesmo jogo, em
+`referencias/razao_categoria_inteira.csv` (gerada por
+`scripts/03_lote_boletins.py`).
+
+| Categoria | Observações | Ingressos | % exatamente metade | Razão mediana | Mínima | Máxima |
+|---|---|---|---|---|---|---|
+| Inteira | 2.335 | 898.596 | 0,0 | 1,0000 | 1,0000 | 1,0000 |
+| Meia | 2.126 | 1.085.246 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
+| Meia Promocional | 54 | 13.916 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
+| PCR | 31 | 290 | 96,8 | 0,5000 | 0,5000 | 1,0000 |
+| Acompanhante | 16 | 1.019 | 0,0 | 1,0000 | 1,0000 | 1,0000 |
+| Meia Social | 10 | 16.870 | 0,0 | 0,5503 | 0,2462 | 0,5633 |
+| Solidário | 10 | 4.155 | 0,0 | 0,5506 | 0,5505 | 0,5506 |
+| Meia Solidária | 3 | 1.781 | 0,0 | 0,5546 | 0,5505 | 0,8283 |
+| Menor | 1 | 1.201 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
+| Meia legal | 1 | 368 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
+
+Ressalvas da medição:
+
+- **Meia Solidária não é fração fixa na base.** São 5 linhas, todas de
+  2025_63 (Água Santa), 3 com Inteira de referência. As razões são 0,5505,
+  0,5546 e 0,8283. Fica com `preco_regulado` falso até decisão.
+- **Menor e Meia legal têm uma observação cada.** Menor de 2023_2 não
+  entra na medição, porque o setor não tem Inteira com o mesmo subtipo
+  (Promoção); o preço dela é igual à Inteira sem subtipo (ver
+  Inconsistências).
+- **PCR** tem uma observação a 1,0 (2024_48, B- GOL, R$ 60 com Inteira a
+  R$ 60).
+
+**Lei ou decreto com preço zero vai para gratuidade.** Categoria cujo
+rótulo casa com lei ou decreto e que o dicionário põe em outro regime
+(hoje, "Lei nº18.159- Meia entrada, menores de 12 anos") vai para o regime
+gratuidade quando o preço é zero, porque preço zero no subconjunto de
+mercado estoura o log na estimação. Com preço acima de zero, fica em
+mercado com `preco_regulado` verdadeiro. Caso na base: 2026_68, Portuguesa
+SAF, 7 ingressos a R$ 0,00.
 
 ## Lacuna conhecida
 

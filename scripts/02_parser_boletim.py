@@ -60,6 +60,7 @@ RODAPE = "Federação Paulista de Futebol"
 MINUSCULA = re.compile(r"[a-zà-öø-ÿ]")
 SUBTIPO_PCD = "P.C.D."
 TOLERANCIA_MEIA = Decimal("0.01")
+LEI_OU_DECRETO = re.compile(r"(lei|decreto)\b", re.IGNORECASE)
 MARCADORES_CATEGORIA = {SUBTIPO_PCD}
 
 COLUNAS = ["A VENDA", "DEVOLVIDOS", "VENDIDOS", "PREÇO", "ARRECADAÇÃO"]
@@ -189,7 +190,8 @@ def casar_categoria(sufixo, refs):
         if p["re"].fullmatch(sufixo):
             avanti = sufixo.removeprefix("Avanti").strip(" -") if p["categoria"] == "Avanti" else ""
             return {"categoria": p["categoria"], "regime": p["regime"],
-                    "rotulo_avanti": avanti, "guarda_preco": p["guarda_preco"]}
+                    "rotulo_avanti": avanti, "guarda_preco": p["guarda_preco"],
+                    "preco_regulado": "nao"}
     return None
 
 
@@ -202,7 +204,8 @@ def separar_setor_categoria(rotulo, refs, preco=None):
     (resolvido depois por resolver_pcd).
     """
     vazio = {"setor": None, "subtipo": None, "categoria": None, "categoria_boletim": None,
-             "regime": None, "rotulo_avanti": None}
+             "regime": None, "rotulo_avanti": None, "preco_regulado": False,
+             "lei_preco_zero": False}
     segs = segmentos(rotulo)
     # P.C.D. é condição do comprador, sempre subtipo. Sozinho no fim do
     # rótulo, a categoria sai da aritmética do boletim (resolver_pcd).
@@ -227,9 +230,22 @@ def separar_setor_categoria(rotulo, refs, preco=None):
     if (cat["guarda_preco"] == "sim" or cat["regime"] == "gratuidade") and preco:
         return {**vazio, "status": "revisao_preco"}
     regime = (refs["subtipos"][subtipo] if subtipo else None) or cat["regime"]
+    categoria_boletim = " - ".join(segs[i:])
+    regulado = cat["preco_regulado"] == "sim"
+    # Categoria de lei ou decreto fora do regime gratuidade (ex.: "Lei
+    # nº18.159- Meia entrada"): com preço zero é gratuidade, porque preço zero
+    # no subconjunto de mercado estoura o log na estimação; com preço acima de
+    # zero fica no regime do dicionário, com preço regulado.
+    lei_preco_zero = False
+    if regime != "gratuidade" and LEI_OU_DECRETO.match(categoria_boletim) and preco is not None:
+        if preco == 0:
+            regime, regulado, lei_preco_zero = "gratuidade", False, True
+        else:
+            regulado = True
     return {"setor": " - ".join(prefixo), "subtipo": subtipo, "categoria": cat["categoria"],
-            "categoria_boletim": " - ".join(segs[i:]), "regime": regime,
-            "rotulo_avanti": cat["rotulo_avanti"] or None, "status": "casado"}
+            "categoria_boletim": categoria_boletim, "regime": regime,
+            "rotulo_avanti": cat["rotulo_avanti"] or None, "preco_regulado": regulado,
+            "lei_preco_zero": lei_preco_zero, "status": "casado"}
 
 
 def centros_colunas(cab):
@@ -346,8 +362,9 @@ def marcar_meia(linhas_tab):
     ("revisao_meia"), exceto subtipo P.C.D. (preço de acessibilidade).
     Setor, subtipo e categoria são mantidos para conferência.
 
-    preco_regulado: categoria Meia, ou subtipo/categoria P.C.D. São preços
-    de obrigação legal ou de acessibilidade, não decisão comercial.
+    preco_regulado: categoria marcada no dicionário (preço é fração fixa da
+    Inteira, medida em referencias/razao_categoria_inteira.csv), categoria de
+    lei com preço acima de zero, ou subtipo P.C.D.
     """
     inteiras = {}
     for r in linhas_tab:
@@ -365,8 +382,7 @@ def marcar_meia(linhas_tab):
         if fora and r["regime"] == "mercado" and r["subtipo"] != SUBTIPO_PCD:
             r.update(regime=None, status="revisao_meia")
     for r in linhas_tab:
-        r["preco_regulado"] = (r["categoria"] in ("Meia", SUBTIPO_PCD)
-                               or r["subtipo"] == SUBTIPO_PCD)
+        r["preco_regulado"] = bool(r.get("preco_regulado")) or r["subtipo"] == SUBTIPO_PCD
 
 
 def marcar_preco_quebrado(r):
