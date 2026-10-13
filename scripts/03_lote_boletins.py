@@ -20,11 +20,13 @@ import importlib.util
 import sys
 from collections import Counter, defaultdict
 from decimal import Decimal
+from statistics import median
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 PASTA_RAW = RAIZ / "data" / "01_raw"
 SAIDA = RAIZ / "data" / "03_processed" / "boletins.csv"
+SAIDA_RAZAO = RAIZ / "referencias" / "razao_categoria_inteira.csv"
 
 JOGOS_POR_ANO = {2023: 109, 2024: 104, 2025: 104, 2026: 72}
 
@@ -51,6 +53,48 @@ REVISAO = "(revisão)"
 REGIMES = ["mercado", "socio", "contrato", "promocional", "gratuidade", "nao_vendido", REVISAO]
 
 
+def linha_fecha(l):
+    """vendidos x preço = arrecadação. Exato quando o preço é impresso; com
+    tolerância de vendidos x 0,005 quando é derivado (arredondado a
+    centavos), para que uma falha de verdade não se esconda nessas linhas."""
+    if not all(c in l for c in ("VENDIDOS", "PREÇO", "ARRECADAÇÃO")):
+        return False
+    diferenca = abs(l["VENDIDOS"] * l["PREÇO"] - l["ARRECADAÇÃO"])
+    if l["preco_derivado"]:
+        return diferenca <= l["VENDIDOS"] * Decimal("0.005")
+    return diferenca == 0
+
+
+def tabela_razao(linhas_por_jogo):
+    """Razão preço / Inteira do mesmo setor e mesmo subtipo, no mesmo jogo,
+    por categoria de regime mercado. Só entra linha com uma única Inteira de
+    referência, de preço acima de zero."""
+    obs = defaultdict(list)
+    for linhas in linhas_por_jogo:
+        ref = defaultdict(set)
+        for l in linhas:
+            if l["status"] == "casado" and l["categoria"] == "Inteira" and l["regime"] == "mercado":
+                ref[(l["setor"], l["subtipo"])].add(l["PREÇO"])
+        for l in linhas:
+            if l["regime"] != "mercado" or "PREÇO" not in l:
+                continue
+            r = ref.get((l["setor"], l["subtipo"]), set())
+            if len(r) != 1 or next(iter(r)) == 0:
+                continue
+            inteira = next(iter(r))
+            obs[l["categoria"]].append((l["PREÇO"] / inteira, l["VENDIDOS"],
+                                        abs(l["PREÇO"] - inteira / 2) <= Decimal("0.01")))
+    tabela = []
+    for cat, v in sorted(obs.items(), key=lambda x: -len(x[1])):
+        razoes = [x[0] for x in v]
+        tabela.append({
+            "categoria": cat, "observacoes": len(v), "ingressos": sum(x[1] for x in v),
+            "pct_exatamente_metade": f"{100 * sum(x[2] for x in v) / len(v):.1f}",
+            "razao_mediana": f"{median(razoes):.4f}", "razao_minima": f"{min(razoes):.4f}",
+            "razao_maxima": f"{max(razoes):.4f}"})
+    return tabela
+
+
 def pct(parte, todo):
     return f"{100 * parte / todo:.1f}" if todo else "-"
 
@@ -61,6 +105,8 @@ def main():
     categorias = parser.carregar_categorias()
 
     registros, abortados = [], []
+    linhas_por_jogo = []
+    lei_zero = 0
     falha_linha, falha_totais, cab_vazio = [], [], {}
     descartadas = {}
     status = Counter()
@@ -96,8 +142,10 @@ def main():
             if probs_totais:
                 falha_totais.append((arq.name, probs_totais))
 
+            linhas_por_jogo.append(r["linhas"])
             for l in r["linhas"]:
                 status[l["status"]] += 1
+                lei_zero += l["lei_preco_zero"]
                 derivados += l["preco_derivado"]
                 if l["pcd_decisao"]:
                     pcd[l["pcd_decisao"]] += 1
@@ -118,9 +166,7 @@ def main():
                 regime = l["regime"] or REVISAO
                 ingressos[(ano, regime)] += l.get("VENDIDOS", 0)
                 receita[(ano, regime)] += l.get("ARRECADAÇÃO", 0)
-                fecha = ("VENDIDOS" in l and "PREÇO" in l and "ARRECADAÇÃO" in l
-                         and not l["preco_derivado"]
-                         and l["VENDIDOS"] * l["PREÇO"] == l["ARRECADAÇÃO"])
+                fecha = linha_fecha(l)
                 registros.append({
                     "ano": ano, "jogo": jogo,
                     **{c: cab.get(c, "") for c in CAMPOS_CABECALHO},
@@ -154,6 +200,7 @@ def main():
         lacuna = LACUNAS_CONHECIDAS.get(nome)
         print(f"  {nome}: {'lacuna conhecida, ' + lacuna if lacuna else erro}")
     print(f"Registros gravados em {SAIDA.relative_to(RAIZ)}: {len(registros)}")
+    print(f"linha_fecha False: {sum(not r['linha_fecha'] for r in registros)}")
     print(f"Jogos distintos na base: {len(jogos)}")
     print()
     print(f"Arquivos com falha em vendidos x preço = arrecadação: {len(falha_linha)}")
@@ -183,6 +230,19 @@ def main():
     for (st, rotulo), n in sorted(em_revisao.items()):
         print(f"  ({n}) [{st}] {rotulo}")
     print(f"Setores distintos (linhas casadas): {len(setores)}")
+    print()
+    print(f"Lei ou decreto com preço zero levado para gratuidade: {lei_zero} linhas")
+    mercado_livre = [r for r in registros if r["regime"] == "mercado" and not r["preco_regulado"]]
+    print(f"Regime mercado com preco_regulado False: {len(mercado_livre)} linhas, "
+          f"{sum(r['vendidos'] for r in mercado_livre):,.0f} ingressos")
+    tabela = tabela_razao(linhas_por_jogo)
+    with open(SAIDA_RAZAO, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(tabela[0]), lineterminator="\n")
+        w.writeheader()
+        w.writerows(tabela)
+    print(f"Razão categoria / Inteira, gravada em {SAIDA_RAZAO.relative_to(RAIZ)}:")
+    for t in tabela:
+        print("  " + " | ".join(str(v) for v in t.values()))
     print()
     print(f"Categoria Meia: {sum(meia.values())} linhas. meia_fora_da_metade True: {meia[True]}, "
           f"False: {meia[False]}, nula: {meia[None]}")
