@@ -1,39 +1,39 @@
-categoria_boletim,categoria,regime,rotulo_avanti
-Inteira,Inteira,mercado,
-Meia,Meia,mercado,
-PCR,PCR,mercado,
-"Lei nº18.159- Meia entrada, menores de 12 anos",Meia legal,mercado,
-Meia Social,Meia Social,mercado,
-Meia Solidária,Meia Solidária,mercado,
-Meia Promocional,Meia Promocional,mercado,
-Solidário,Solidário,mercado,
-Acompanhante,Acompanhante,mercado,
-Menor,Menor,mercado,
-Sócio,Sócio,socio,
-Sócio - Carteirinha,Sócio - Carteirinha,socio,
-Sócio Black,Sócio,socio,
-Sócio Gold,Sócio,socio,
-Sócio Silver,Sócio,socio,
-Fiel Torcedor,Sócio,socio,
-Avanti - 20% Desconto,Avanti,socio,20% Desconto
-Avanti - 25% Desconto,Avanti,socio,25% Desconto
-Avanti - 50% Desconto,Avanti,socio,50% Desconto
-Avanti - 75% Desconto,Avanti,socio,75% Desconto
-Avanti - 100% Desconto,Avanti,socio,100% Desconto
-Carnê de Relacionamento,Carnê de Relacionamento,contrato,
-Carnê Superficiária,Carnê Superficiária,contrato,
-Cadeira Vitalícia,Cadeira Vitalícia,contrato,
-Proprietário Black,Proprietário,contrato,
-Proprietário Gold,Proprietário,contrato,
-Proprietário Silver,Proprietário,contrato,
-Passaporte,Passaporte,contrato,
-Tribuna do Conselho,Tribuna do Conselho,contrato,
-CLUBE 1900,CLUBE 1900,contrato,
-Único,Único,contrato,
-Camarote,Camarote,contrato,
-VENDA PROIBIDA,VENDA PROIBIDA,nao_vendido,
-Área Restrita - VENDA PROIBIDA,Área Restrita - VENDA PROIBIDA,nao_vendido,
-Carnê - Venda Proibida,Carnê - Venda Proibida,nao_vendido,
-Promocional - Venda Proibida,Promocional - Venda Proibida,nao_vendido,
-Gratuidade,Gratuidade,gratuidade,
-Palmeiras Pay,Palmeiras Pay,promocional,
+categoria_boletim,categoria,regime,rotulo_avanti,preco_regulado
+Inteira,Inteira,mercado,,nao
+Meia,Meia,mercado,,sim
+PCR,PCR,mercado,,sim
+"Lei nº18.159- Meia entrada, menores de 12 anos",Meia legal,mercado,,sim
+Meia Social,Meia Social,mercado,,nao
+Meia Solidária,Meia Solidária,mercado,,nao
+Meia Promocional,Meia Promocional,mercado,,sim
+Solidário,Solidário,mercado,,sim
+Acompanhante,Acompanhante,mercado,,sim
+Menor,Menor,mercado,,sim
+Sócio,Sócio,socio,,nao
+Sócio - Carteirinha,Sócio - Carteirinha,socio,,nao
+Sócio Black,Sócio,socio,,nao
+Sócio Gold,Sócio,socio,,nao
+Sócio Silver,Sócio,socio,,nao
+Fiel Torcedor,Sócio,socio,,nao
+Avanti - 20% Desconto,Avanti,socio,20% Desconto,nao
+Avanti - 25% Desconto,Avanti,socio,25% Desconto,nao
+Avanti - 50% Desconto,Avanti,socio,50% Desconto,nao
+Avanti - 75% Desconto,Avanti,socio,75% Desconto,nao
+Avanti - 100% Desconto,Avanti,socio,100% Desconto,nao
+Carnê de Relacionamento,Carnê de Relacionamento,contrato,,nao
+Carnê Superficiária,Carnê Superficiária,contrato,,nao
+Cadeira Vitalícia,Cadeira Vitalícia,contrato,,nao
+Proprietário Black,Proprietário,contrato,,nao
+Proprietário Gold,Proprietário,contrato,,nao
+Proprietário Silver,Proprietário,contrato,,nao
+Passaporte,Passaporte,contrato,,nao
+Tribuna do Conselho,Tribuna do Conselho,contrato,,nao
+CLUBE 1900,CLUBE 1900,contrato,,nao
+Único,Único,contrato,,nao
+Camarote,Camarote,contrato,,nao
+VENDA PROIBIDA,VENDA PROIBIDA,nao_vendido,,nao
+Área Restrita - VENDA PROIBIDA,Área Restrita - VENDA PROIBIDA,nao_vendido,,nao
+Carnê - Venda Proibida,Carnê - Venda Proibida,nao_vendido,,nao
+Promocional - Venda Proibida,Promocional - Venda Proibida,nao_vendido,,nao
+Gratuidade,Gratuidade,gratuidade,,nao
+Palmeiras Pay,Palmeiras Pay,promocional,,nao
