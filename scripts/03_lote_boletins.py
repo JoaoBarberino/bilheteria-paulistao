@@ -44,7 +44,12 @@ _spec.loader.exec_module(parser)
 
 CAMPOS_CABECALHO = ["boletim", "mandante", "visitante", "data", "horario",
                     "estadio", "cidade", "uf", "competicao"]
-COLUNAS_CSV = (["ano", "jogo"] + CAMPOS_CABECALHO +
+# Colunas do cabeçalho no CSV: o texto do boletim fica em *_boletim e a
+# forma padronizada pelos dicionários de referencias/ fica no nome curto.
+COLUNAS_CABECALHO_CSV = ["boletim", "mandante_boletim", "mandante", "visitante_boletim",
+                         "visitante", "data", "horario", "estadio_boletim", "estadio",
+                         "cidade_boletim", "cidade", "uf", "competicao"]
+COLUNAS_CSV = (["ano", "jogo"] + COLUNAS_CABECALHO_CSV +
                ["rotulo", "setor", "subtipo", "categoria", "categoria_boletim", "regime",
                 "rotulo_avanti", "status", "a_venda", "devolvidos", "vendidos",
                 "preco", "preco_derivado", "preco_quebrado", "preco_regulado",
@@ -102,6 +107,34 @@ def tabela_razao(linhas_por_jogo):
             "razao_meia_minima": f"{min(m):.4f}" if m else "",
             "razao_meia_maxima": f"{max(m):.4f}" if m else ""})
     return tabela
+
+
+def carregar_padronizacao():
+    """Dicionários de clube e estádio (referencias/clubes.csv e estadios.csv)."""
+    with open(RAIZ / "referencias" / "clubes.csv", encoding="utf-8", newline="") as f:
+        clubes = {l["nome_boletim"]: l["clube"] for l in csv.DictReader(f)}
+    with open(RAIZ / "referencias" / "estadios.csv", encoding="utf-8", newline="") as f:
+        estadios = {l["nome_boletim"]: l for l in csv.DictReader(f)}
+    return clubes, estadios
+
+
+def padronizar(registros, clubes, estadios):
+    """Aplica os dicionários ao cabeçalho de cada registro. Nome sem
+    correspondência fica com o campo padronizado vazio e é listado."""
+    sem = {"clube": set(), "estadio": set()}
+    for r in registros:
+        for papel in ("mandante", "visitante"):
+            nome = r[f"{papel}_boletim"]
+            r[papel] = clubes.get(nome, "")
+            if nome not in clubes:
+                sem["clube"].add(nome)
+        e = estadios.get(r["estadio_boletim"])
+        if e is None:
+            sem["estadio"].add(r["estadio_boletim"])
+            r["estadio"], r["cidade"] = "", ""
+        else:
+            r["estadio"], r["cidade"] = e["estadio"], e["cidade"]
+    return sem
 
 
 def pct(parte, todo):
@@ -178,7 +211,13 @@ def main():
                 fecha = linha_fecha(l)
                 registros.append({
                     "ano": ano, "jogo": jogo,
-                    **{c: cab.get(c, "") for c in CAMPOS_CABECALHO},
+                    "boletim": cab.get("boletim", ""),
+                    "mandante_boletim": cab.get("mandante", ""),
+                    "visitante_boletim": cab.get("visitante", ""),
+                    "data": cab.get("data", ""), "horario": cab.get("horario", ""),
+                    "estadio_boletim": cab.get("estadio", ""),
+                    "cidade_boletim": cab.get("cidade", ""),
+                    "uf": cab.get("uf", ""), "competicao": cab.get("competicao", ""),
                     "rotulo": l["rotulo"], "setor": l["setor"] or "", "subtipo": l["subtipo"] or "",
                     "categoria": l["categoria"] or "",
                     "categoria_boletim": l["categoria_boletim"] or "",
@@ -193,6 +232,16 @@ def main():
                     "arrecadacao": l.get("ARRECADAÇÃO", ""),
                     "linha_fecha": fecha, "totais_conferem": not probs_totais,
                 })
+
+    clubes, estadios = carregar_padronizacao()
+    sem = padronizar(registros, clubes, estadios)
+    for campo in ("mandante", "visitante", "estadio", "cidade"):
+        antes = len({r[f"{campo}_boletim"] for r in registros})
+        depois = len({r[campo] for r in registros})
+        print(f"{campo}: {antes} nomes distintos no boletim, {depois} depois da padronização")
+    print(f"Clubes sem correspondência em referencias/clubes.csv: {sorted(sem['clube']) or 'nenhum'}")
+    print(f"Estádios sem correspondência em referencias/estadios.csv: {sorted(sem['estadio']) or 'nenhum'}")
+    print()
 
     SAIDA.parent.mkdir(parents=True, exist_ok=True)
     with open(SAIDA, "w", encoding="utf-8", newline="") as f:
