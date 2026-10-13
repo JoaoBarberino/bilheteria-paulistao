@@ -45,8 +45,10 @@ CAMPOS_CABECALHO = ["boletim", "mandante", "visitante", "data", "horario",
 COLUNAS_CSV = (["ano", "jogo"] + CAMPOS_CABECALHO +
                ["rotulo", "setor", "subtipo", "categoria", "categoria_boletim", "regime",
                 "rotulo_avanti", "status", "a_venda", "devolvidos", "vendidos",
-                "preco", "preco_derivado", "arrecadacao", "linha_fecha", "totais_conferem"])
+                "preco", "preco_derivado", "preco_quebrado", "arrecadacao", "linha_fecha",
+                "totais_conferem"])
 REVISAO = "(revisão)"
+REGIMES = ["mercado", "socio", "contrato", "promocional", "gratuidade", "nao_vendido", REVISAO]
 
 
 def pct(parte, todo):
@@ -63,6 +65,9 @@ def main():
     descartadas = {}
     status = Counter()
     derivados = 0
+    pcd = Counter()
+    quebrados = []
+    menores = []
     em_revisao = Counter()
     setores = set()
     ingressos = defaultdict(Decimal)   # (ano, regime)
@@ -92,6 +97,14 @@ def main():
             for l in r["linhas"]:
                 status[l["status"]] += 1
                 derivados += l["preco_derivado"]
+                if l["pcd_decisao"]:
+                    pcd[l["pcd_decisao"]] += 1
+                if l["preco_quebrado"]:
+                    quebrados.append((arq.stem, l))
+                if l["categoria"] == "Menor":
+                    ref = sorted({x["PREÇO"] for x in r["linhas"] if x["setor"] == l["setor"]
+                                  and x["categoria"] == "Inteira"})
+                    menores.append((arq.stem, l, ref))
                 if l["status"] != "casado":
                     em_revisao[(l["status"], l["rotulo"])] += 1
                 else:
@@ -112,7 +125,7 @@ def main():
                     "status": l["status"],
                     "a_venda": l.get("A VENDA", ""), "devolvidos": l.get("DEVOLVIDOS", ""),
                     "vendidos": l.get("VENDIDOS", ""), "preco": l.get("PREÇO", ""),
-                    "preco_derivado": l["preco_derivado"],
+                    "preco_derivado": l["preco_derivado"], "preco_quebrado": l["preco_quebrado"],
                     "arrecadacao": l.get("ARRECADAÇÃO", ""),
                     "linha_fecha": fecha, "totais_conferem": not probs_totais,
                 })
@@ -152,6 +165,8 @@ def main():
     print(f"Linhas casadas: {status['casado']}")
     print(f"Subtipo desconhecido: {status['subtipo_desconhecido']}")
     print(f"Gratuidade com preço (revisão): {status['revisao_preco']}")
+    print(f"P.C.D. sozinho: {sum(pcd.values())} linhas. Inteira: {pcd['inteira']}, "
+          f"Meia: {pcd['meia']}, revisão: {pcd['revisao']}")
     print(f"Linhas sem categoria: {status['sem_categoria']}")
     ti = sum(ingressos.values())
     tr = sum(v for (_, g), v in ingressos.items() if g == REVISAO)
@@ -160,9 +175,19 @@ def main():
         print(f"  ({n}) [{st}] {rotulo}")
     print(f"Setores distintos (linhas casadas): {len(setores)}")
     print()
+    print("Categoria Menor, com a Inteira do mesmo setor no mesmo jogo:")
+    for jogo, l, ref in menores:
+        print(f"  {jogo} | {l['rotulo']} | vendidos {l['VENDIDOS']} | preço {l['PREÇO']} | "
+              f"Inteira do setor: {', '.join(str(p) for p in ref) or 'nenhuma'}")
+    print()
+    n_ing = sum(l.get("VENDIDOS", 0) for _, l in quebrados)
+    print(f"preco_quebrado (detector, sem reclassificação): {len(quebrados)} linhas, "
+          f"{n_ing:,.0f} ingressos")
+    for jogo, l in quebrados[:15]:
+        print(f"  {jogo} | {l['setor'] or '?'} | {l['rotulo']} | {l['PREÇO']}")
+    print()
 
-    regimes = sorted({g for _, g in ingressos},
-                     key=lambda g: -sum(v for (a, x), v in ingressos.items() if x == g))
+    regimes = REGIMES + sorted({g for _, g in ingressos} - set(REGIMES))
     for titulo, anos in [("Total", list(JOGOS_POR_ANO))] + [(str(a), [a]) for a in JOGOS_POR_ANO]:
         ti = sum(v for (a, _), v in ingressos.items() if a in anos)
         tr = sum(v for (a, _), v in receita.items() if a in anos)
