@@ -80,35 +80,60 @@ def linha_fecha(l):
     return diferenca == 0
 
 
-def tabela_razao(linhas_por_jogo):
-    """Razão entre o preço e a Inteira, e entre o preço e a Meia, do mesmo
-    setor e mesmo subtipo, no mesmo jogo, por categoria de regime mercado.
-    Cada razão só usa linha com uma única referência, de preço acima de
-    zero. A razão sobre a Meia é a que revela taxa de conveniência sobre a
-    meia-entrada."""
-    obs = {"Inteira": defaultdict(list), "Meia": defaultdict(list)}
+def referencia_por_setor(linhas, categoria):
+    """Preço único de `categoria` (regime mercado, casado) por (setor, subtipo)
+    no jogo. Setor com mais de um preço distinto fica sem referência."""
+    precos = defaultdict(set)
+    for l in linhas:
+        if l["status"] == "casado" and l["regime"] == "mercado" and l["categoria"] == categoria:
+            precos[(l["setor"], l["subtipo"])].add(l["PREÇO"])
+    return {k: next(iter(v)) for k, v in precos.items() if len(v) == 1 and next(iter(v)) > 0}
+
+
+def buscar_referencia(ref, setor, subtipo):
+    """Mesma regra da guarda meia_fora_da_metade: mesmo setor e subtipo; sem
+    ela, o mesmo setor sem subtipo."""
+    return ref.get((setor, subtipo)) or ref.get((setor, None))
+
+
+def tabela_razao(linhas_por_jogo, categorias):
+    """Razão entre o preço de cada categoria e a Inteira (e a Meia) de
+    mercado do mesmo setor e jogo, ANTES da guarda da meia-entrada.
+
+    Entra toda linha das `categorias` (as de regime mercado no dicionário),
+    qualquer que seja o destino final; a coluna `situacao` diz se a linha
+    ficou em mercado, foi para revisão ou mudou de regime pelo subtipo. A
+    Inteira não entra: é a referência, e compará-la consigo mesma daria 1
+    por construção. Pelo mesmo motivo, a razão sobre a Meia não é calculada
+    para a própria Meia.
+    """
+    obs = defaultdict(lambda: {"inteira": [], "meia": []})
     for linhas in linhas_por_jogo:
-        ref = {"Inteira": defaultdict(set), "Meia": defaultdict(set)}
+        ref_inteira = referencia_por_setor(linhas, "Inteira")
+        ref_meia = referencia_por_setor(linhas, "Meia")
         for l in linhas:
-            if l["status"] == "casado" and l["regime"] == "mercado" and l["categoria"] in ref:
-                ref[l["categoria"]][(l["setor"], l["subtipo"])].add(l["PREÇO"])
-        for l in linhas:
-            if l["regime"] != "mercado" or "PREÇO" not in l:
+            if l["categoria"] not in categorias or "PREÇO" not in l:
                 continue
-            for base in ("Inteira", "Meia"):
-                r = ref[base].get((l["setor"], l["subtipo"]), set())
-                if len(r) != 1 or next(iter(r)) == 0:
-                    continue
-                preco_ref = next(iter(r))
-                obs[base][l["categoria"]].append(
-                    (l["PREÇO"] / preco_ref, l["VENDIDOS"],
-                     abs(l["PREÇO"] - preco_ref / 2) <= Decimal("0.01")))
+            chave = (l["categoria"], l["regime"] or "revisão")
+            inteira = buscar_referencia(ref_inteira, l["setor"], l["subtipo"])
+            if inteira:
+                obs[chave]["inteira"].append(
+                    (l["PREÇO"] / inteira, l["VENDIDOS"],
+                     abs(l["PREÇO"] - inteira / 2) <= Decimal("0.01")))
+            meia = buscar_referencia(ref_meia, l["setor"], l["subtipo"])
+            if meia and l["categoria"] != "Meia":
+                obs[chave]["meia"].append(l["PREÇO"] / meia)
     tabela = []
-    for cat, v in sorted(obs["Inteira"].items(), key=lambda x: -len(x[1])):
+    ordem = sorted(obs, key=lambda k: (-sum(len(obs[c]["inteira"]) for c in obs if c[0] == k[0]),
+                                       k[0], -len(obs[k]["inteira"])))
+    for categoria, situacao in ordem:
+        v, m = obs[(categoria, situacao)]["inteira"], obs[(categoria, situacao)]["meia"]
+        if not v:
+            continue
         razoes = [x[0] for x in v]
-        m = [x[0] for x in obs["Meia"].get(cat, [])]
         tabela.append({
-            "categoria": cat, "observacoes": len(v), "ingressos": sum(x[1] for x in v),
+            "categoria": categoria, "situacao": situacao,
+            "observacoes": len(v), "ingressos": sum(x[1] for x in v),
             "pct_exatamente_metade": f"{100 * sum(x[2] for x in v) / len(v):.1f}",
             "razao_mediana": f"{median(razoes):.4f}", "razao_minima": f"{min(razoes):.4f}",
             "razao_maxima": f"{max(razoes):.4f}",
@@ -290,7 +315,9 @@ def main(argv=None):
 
     # Grava em temporário e só substitui o versionado depois da verificação.
     esperados = sum(JOGOS_POR_ANO.values())
-    tabela = tabela_razao(linhas_por_jogo)
+    categorias_mercado = {c["categoria"] for c in categorias["literais"].values()
+                          if c["regime"] == "mercado"} - {"Inteira"}
+    tabela = tabela_razao(linhas_por_jogo, categorias_mercado)
     tmp_base = SAIDA.with_name(SAIDA.name + ".tmp")
     tmp_razao = SAIDA_RAZAO.with_name(SAIDA_RAZAO.name + ".tmp")
     gravar_csv(tmp_base, registros, COLUNAS_CSV)
