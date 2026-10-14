@@ -33,8 +33,9 @@ A pergunta deste projeto é como a demanda por ingresso responde ao preço.
 
 O boletim financeiro de cada partida fica em URL determinística no site da
 FPF. A coleta (`scripts/01_coleta_boletins.py`) baixou os 389 boletins das
-temporadas 2023 (109 jogos), 2024 (104), 2025 (104) e 2026 (72). Os PDFs
-ficam fora do repositório.
+temporadas 2023 (109 jogos), 2024 (104), 2025 (104) e 2026 (72). Os PDFs da
+coleta ficam fora do repositório; quatro boletins ficam versionados em
+`tests/fixtures/` para os testes (ver Fonte e direitos).
 
 ### Extração e validação
 
@@ -284,6 +285,32 @@ que o clube cobra pouco.
 | `figuras/` | Gráficos gerados pelos notebooks |
 | `tests/` | Testes de regressão do parser e do lote |
 | `requirements.txt` | Pacotes e versões usados |
+| `LICENSE` | Licença MIT do código |
+
+## Fonte e direitos
+
+Os boletins são da Federação Paulista de Futebol, baixados da URL
+determinística
+`https://conteudo.fpf.org.br/Competicoes/{ANO}/3973/boletins-financeiros/{N}/boletins/{N}.pdf`,
+em que 3973 é o identificador do Paulistão A1 e N é o número do jogo. A
+coleta foi feita em 10/10/2026.
+
+A FPF não concedeu licença para este uso, e os termos de uso do site não
+foram verificados.
+
+O código deste repositório é licenciado sob MIT (`LICENSE`). A contribuição
+do autor sobre os dados derivados (a base processada em
+`data/03_processed/`, os dicionários e tabelas em `referencias/`, os
+gráficos e o texto) é licenciada sob CC BY 4.0. Nenhuma das duas licenças
+cobre o conteúdo original dos boletins da FPF, cujos direitos continuam da
+FPF.
+
+`tests/fixtures/` contém quatro boletins oficiais completos (2023_55,
+2024_52, 2025_78 e 2026_72), um por temporada. Eles ficam versionados
+porque os testes de regressão precisam de PDFs reais: cobrem a tabela em
+várias páginas, linhas vazias do formulário, categorias como PCR e Cativa
+e o gabarito lido à mão de 2026_72. Os demais PDFs da coleta não estão no
+repositório.
 
 ## Como reproduzir
 
@@ -307,7 +334,10 @@ python -m unittest discover tests
    o que já está em disco e registra falhas sem interromper.
 2. `03_lote_boletins.py` roda o parser em todos os boletins, grava
    `data/03_processed/boletins.csv` e `referencias/razao_categoria_inteira.csv`
-   e imprime o relatório do lote.
+   e imprime o relatório do lote. Os dois arquivos só são substituídos se
+   nenhum boletim fora da lacuna conhecida (2025_57) abortar; sem os PDFs em
+   disco, ou com a coleta incompleta, o lote não toca nos arquivos
+   versionados e termina com código de saída 1.
 3. Os testes conferem o gabarito de 2026_72, os fixtures em
    `tests/fixtures/` e a padronização do CSV.
 4. Depois, abra e execute os notebooks em ordem, num ambiente Jupyter:
