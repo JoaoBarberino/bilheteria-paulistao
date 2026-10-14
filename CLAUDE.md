@@ -75,6 +75,9 @@ deve ser reportado como tal.
   resumida.
 - Exceção deliberada, decidida pelo autor: o README abre com um resumo do
   resultado principal entre o título e a seção Problema, antes da ordem acima.
+- Exceção deliberada, decidida pelo autor: a seção de limitações do README
+  traz só as três que mudam a leitura do resultado; as demais ficam em
+  `docs/limitacoes.md`, com o mesmo texto, sem resumo.
 - Prosa direta, frases curtas. Sem travessão. Sem linguagem promocional.
 - Gráfico sem rótulo de eixo e sem unidade não entra.
 
