@@ -75,8 +75,11 @@ arrecadação de cada linha, e testes de unidade da geometria do parser.
 Cada rótulo de setor vira setor, subtipo e categoria, por dicionário
 explícito em `referencias/`. Toda categoria recebe um regime: mercado,
 sócio, contrato, gratuidade, não vendido ou promocional. Nome de clube e
-de estádio também passam por dicionário. Nenhum rótulo, clube ou estádio
-fica sem correspondência.
+de estádio também passam por dicionário. Na base atual, todo clube e todo
+estádio têm correspondência, e nenhum rótulo fica sem categoria. Isso não
+garante que um rótulo novo seja classificado certo: alguns padrões são
+abertos e podem absorver uma cauda de categoria sem mandar a linha para
+revisão (ver "Defeitos latentes" em `docs/limitacoes.md`).
 
 A tabela `referencias/razao_categoria_inteira.csv` mede a razão entre o
 preço de cada categoria de mercado e a Inteira de mercado do mesmo setor e
@@ -132,6 +135,24 @@ A unidade de análise é setor x jogo. O preço é o da Inteira do setor
 ingressos de regime mercado vendidos no setor, inclusive Meia, porque quem
 escolhe o setor pelo preço da Inteira pode comprar a Meia. Setor é
 identificado por mandante e nome do setor.
+
+Dos 2.562 setor-jogos de regime mercado, 341 ficam fora da amostra porque
+não têm linha de Inteira não regulada, e 9 são descartados porque têm mais
+de um preço de Inteira distinto no mesmo setor e jogo. Ficam 2.212
+setor-jogos, em 387 jogos e 337 setores.
+
+Preços comparados entre temporadas (a faixa de preço de cada setor e o
+preço real no notebook `04_descritiva`) estão em reais de 2026,
+deflacionados pelo IPCA anual (ver `referencias/ipca_fonte.md`). Os
+valores citados de boletins específicos estão em reais correntes da
+partida. O modelo usa preço nominal: o efeito fixo de partida absorve o
+nível de preço de cada temporada, então deflacionar não muda o beta.
+
+A variação a explorar existe: em 314 dos 387 jogos há pelo menos dois
+preços de Inteira distintos, e na metade deles a Inteira mais cara custa
+pelo menos o dobro da mais barata.
+
+![Razão entre o maior e o menor preço de Inteira no jogo](figuras/04_descritiva/a_variacao_intrapartida.png)
 
 A especificação principal (E2) é
 
@@ -225,7 +246,54 @@ produz o resultado. Esse desvio-padrão não é medida de incerteza
 alternativa: o embaralhamento destrói a dependência dentro do jogo que o
 erro agrupado contabiliza.
 
-![Resíduo contra valor ajustado de E2](figuras/05_modelo/residuo_ajustado_E2.png)
+O gráfico abaixo mostra de onde vem o número. São log de preço e log de
+quantidade depois de retirar os efeitos fixos de partida e de setor; a
+reta, com inclinação igual ao beta de E2, é a própria estimativa. A maior
+parte dos pontos está perto de zero no eixo do preço: depois dos efeitos
+fixos sobra pouca variação de preço, e é dela que a estimativa vem.
+
+![De onde vem o beta de E2](figuras/05_modelo/residualizado_E2.png)
+
+### Em relação à literatura
+
+Estudos de demanda por ingresso em esporte profissional costumam estimar
+que os clubes precificam na parte inelástica da demanda, o que contraria a
+previsão de um monopolista que maximiza lucro com custo marginal não
+negativo. Coates e Humphreys (2007) encontram demanda inelástica ao preço
+em MLB, NBA e NFL. Fort (2004) revisa essas estimativas e as explicações
+para o padrão. Krautmann e Berri (2007) e Coates e Humphreys (2007)
+explicam o preço inelástico pela receita de bares, estacionamento e outros
+produtos ligados ao público; Fort (2004), por relações de receita de TV
+local. Borland e Macdonald (2003) revisam a literatura de demanda por
+esporte.
+
+Os pontos estimados aqui caem na mesma região: negativos e, na
+especificação principal, entre -1 e 0 (-0,468). Mas o intervalo da
+principal vai de -0,975 a +0,039, e as variantes cujo intervalo exclui
+zero têm intervalo que também passa de -1. Esta base, portanto, não
+confirma nem contradiz a inelasticidade relatada na literatura.
+
+O que a identificação dentro da partida acrescenta: o efeito fixo de
+partida remove o choque de demanda comum ao jogo (adversário, data,
+importância), que nos estudos com público e preço médio por jogo move preço
+e público na mesma direção. O que ela não acrescenta: o beta é de um setor
+contra os outros do mesmo jogo, com substituição entre setores. A
+literatura citada trata da demanda pelo jogo como um todo, e esta base não
+identifica essa elasticidade. A comparação é de ordem de grandeza, não de
+estimando.
+
+Referências:
+
+- Borland, J. e Macdonald, R. (2003). Demand for sport. *Oxford Review of
+  Economic Policy*, 19(4), 478-502.
+- Coates, D. e Humphreys, B. R. (2007). Ticket prices, concessions and
+  attendance at professional sporting events. *International Journal of
+  Sport Finance*, 2(3), 161-170.
+- Fort, R. (2004). Inelastic sports pricing. *Managerial and Decision
+  Economics*, 25(2), 87-94.
+- Krautmann, A. C. e Berri, D. J. (2007). Can we find it at the
+  concessions? Understanding price elasticity in professional sports.
+  *Journal of Sports Economics*, 8(2), 183-191.
 
 ### O que isso implica
 
@@ -252,9 +320,14 @@ log(arrecadação).
 
 A evidência para aí. Ela não diz o que acontece numa alta geral de preço,
 não diz qual é o preço ótimo e não diz que algum clube cobra pouco (ver
-Limitações 1, 2, 9 e 11).
+Limitações 1 e 2 e, em `docs/limitacoes.md`, as limitações 9 e 11).
 
 ## Limitações metodológicas conhecidas
+
+As três limitações abaixo mudam como se lê o resultado. As demais, com o
+mesmo texto e os mesmos números, estão em
+[`docs/limitacoes.md`](docs/limitacoes.md), junto com os defeitos latentes
+do pipeline.
 
 **1. O beta é de setor, com substituição, não de mercado.** O efeito fixo
 de partida absorve todo movimento de preço comum aos setores do jogo, então
@@ -280,16 +353,7 @@ levam o ponto a -0,161 (100+ ingressos) e -0,075 (200+). Das 16 variantes
 com agrupamento duplo, 4 excluem zero, e nas 4 o intervalo também passa de
 -1. A curva completa está em `referencias/curva_especificacao.csv`.
 
-**3. Endogeneidade residual.** O clube também escolhe o preço de cada
-setor. Se ele encarece o setor que espera vender bem naquele jogo, por
-motivo que nem o efeito fixo de partida nem o de setor captura, o beta é
-puxado em direção a zero. A base não tem instrumento para separar isso.
-Sem modelo, preço e público andam juntos entre setores e jogos
-(`figuras/04_descritiva/d_preco_publico_setor.png`), porque clube caro é
-clube grande. Os efeitos fixos removem essa parte, não a escolha de preço
-dentro do jogo.
-
-**4. Censura por capacidade.** Sem laudo técnico de capacidade dos
+**3. Censura por capacidade.** Sem laudo técnico de capacidade dos
 estádios, não se sabe que setor esgotou. Em setor esgotado, o público
 observado é teto, não demanda, e isso puxa o beta para zero. O filtro usado
 é proxy: ocupação aparente é o público do setor no jogo dividido pelo maior
@@ -297,67 +361,6 @@ público do mesmo setor na base. Excluir as 447 unidades com ocupação
 aparente de 0,90 ou mais leva o beta de -0,468 a -0,811. O máximo
 histórico subestima a capacidade, então o filtro é conservador e não
 resolve a censura.
-
-**5. Parte pequena da base identifica o modelo.** O subconjunto
-identificador (regime mercado, preço não regulado) são 2.290 das 12.241
-linhas. O regime mercado é 43,4% dos ingressos da base (2.094.600 de
-4.821.229). Sócio é 41,8%, contrato 11,0%, gratuidade 2,0%, não vendido
-1,7% e promocional 0,1%. A elasticidade vale para o público de mercado,
-não para o sócio-torcedor nem para o contrato de longo prazo.
-
-**6. Concentração.** São Paulo, Palmeiras, Santos e Corinthians somam
-50,5% das unidades da estimação (1.118 de 2.212 setor-jogos) e 58,0% dos
-ingressos de mercado dessas unidades, em 110 dos 387 jogos. Com erro
-agrupado por jogo e setor, sem eles o beta é -0,647, com IC 95% de -1,413 a
-+0,119 (1.094 setor-jogos, 277 jogos, 182 setores). Só com eles, o beta é
--0,231, com IC 95% de -0,924 a +0,463 (1.118 setor-jogos, 110 jogos, 155
-setores). Os dois intervalos contêm zero e se sobrepõem, então não dá para
-afirmar que os grupos diferem nem que algum deles tem elasticidade
-distinguível de zero. O ponto mais negativo sem os quatro grandes indica
-que o resultado não é puxado por eles.
-*Hipótese, não testada:* clube grande esgota setor com mais frequência, e
-a censura puxa o beta para zero (Limitação 4), o que explicaria um beta
-menor em módulo entre os quatro grandes.
-
-**7. Anomalia de composição em 2025.** O público de mercado por jogo cai
-de 6.043 em 2024 para 3.928 em 2025 e volta a 5.402 em 2026. Ao ritmo de
-2024, faltam 217.870 ingressos de mercado em 2025. A queda atinge 8 dos 14
-mandantes presentes nas duas temporadas, com Santos a -77%, Mirassol a
--72%, Botafogo a -64%, São Paulo a -56% e Corinthians a -52%; seis
-mandantes ficam estáveis ou sobem. Rótulos novos de sócio e contrato em
-2025 somam 4.226 ingressos, e o boletim não ficou menos detalhado (31,0
-linhas por boletim em 2024 e 33,3 em 2025). A causa é desconhecida e
-nenhuma correção foi aplicada.
-
-**8. Taxa de conveniência de 10%.** Em parte dos boletins ela aparece como
-categoria própria (Meia Social, Solidário, a 1,10 da Meia). Em outros pode
-estar embutida no preço da Inteira. Isso contamina a comparação de nível de
-preço entre clubes (`notebooks/04_descritiva`, gráfico c).
-
-**9. Faixa de preço observada.** A conta de receita só vale dentro da
-faixa de preço que cada setor já praticou. Com +20% de preço, 30,0% dos
-setor-jogos saem da faixa do próprio setor; com -20%, 51,3%; com +10%,
-26,3%; com -10%, 42,8%. 142 dos 337 setores praticaram um só preço real em
-toda a base, e para eles qualquer variação é extrapolação.
-
-**10. Dados ausentes e inconsistentes na fonte.** O boletim 2025_57 está
-fora da base: o cabeçalho da tabela sai embaralhado na extração e a linha
-TOTAIS não traz arrecadação, então o jogo não pode ser validado. Os números
-não foram digitados à mão. Em 2024_40 (Inter Limeira x São Paulo), 7 linhas
-rotuladas Gratuidade têm preço de R$ 89 a R$ 219 e somam R$ 212.586. O
-rótulo e o preço se contradizem na fonte, e as linhas ficam em revisão,
-fora de qualquer regime.
-
-**11. Recomendar preço não é entrega deste projeto.** Com coeficiente de
-arrecadação positivo e constante, a receita do setor cresce sem limite com
-o preço no modelo. Isso é consequência da forma funcional, não do mundo, e
-por isso não há preço ótimo a calcular. Além disso, o intervalo do
-coeficiente contém zero, e nem o sinal do efeito sobre a receita está
-estabelecido. A conta de receita também
-ignora o que o preço afeta além da bilheteria: consumo dentro do estádio,
-conversão de sócio, formação de torcedor no longo prazo, ambiente de
-estádio cheio e capacidade. O clube pode estar escolhendo o preço atual de
-propósito, por esses motivos.
 
 ## Estrutura do repositório
 
@@ -369,6 +372,7 @@ propósito, por esses motivos.
 | `referencias/` | Dicionários de categoria, subtipo, clube e estádio; IPCA; razão sobre a Inteira; curva de especificação |
 | `data/03_processed/` | Base processada e dicionário de colunas |
 | `notebooks/` | Descritiva (04), modelo (05) e receita (06) |
+| `docs/limitacoes.md` | Limitações secundárias e defeitos latentes do pipeline |
 | `figuras/` | Gráficos gerados pelos notebooks |
 | `tests/` | Testes de regressão do parser e do lote |
 | `requirements.txt` | Pacotes e versões usados |
@@ -398,6 +402,8 @@ porque os testes de regressão precisam de PDFs reais: cobrem a tabela em
 várias páginas, linhas vazias do formulário, categorias como PCR e Cativa
 e o gabarito lido à mão de 2026_72. Os demais PDFs da coleta não estão no
 repositório.
+
+Este projeto foi feito com assistência de IA; o `CLAUDE.md` versionado documenta o método de trabalho, e as decisões metodológicas e a revisão são do autor.
 
 ## Como reproduzir
 
