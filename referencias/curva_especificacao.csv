@@ -1,0 +1,19 @@
+grupo,variante,beta,erro_padrao,ic95_inf,ic95_sup,n_obs,n_jogos,n_setores,agrupamento,exclui_zero
+Principal,"E2, quantidade, sem peso (principal)",-0.468022,0.258362,-0.974815,0.038771,2212,387,337,jogo e setor,False
+Comparação,"E2, quantidade, sem peso, agrupado só por jogo",-0.468022,0.211619,-0.883125,-0.052919,2212,387,337,jogo,True
+Especificação,"E1, só efeito fixo de partida",-0.769121,0.249967,-1.259372,-0.278869,2212,387,337,jogo e setor,True
+Ponderação,"E2, peso exógeno (média de q do setor nos outros jogos)",-0.382841,0.242324,-0.858172,0.092489,2099,377,224,jogo e setor,False
+Ponderação,"E2, peso = q (endógeno)",0.114472,0.244293,-0.364723,0.593667,2212,387,337,jogo e setor,False
+Quantidade,"E2, quantidade = só Inteira",-1.011323,0.342542,-1.683239,-0.339407,2212,387,337,jogo e setor,True
+Amostra,"E2, unidades com 100+ ingressos",-0.16092,0.242721,-0.637231,0.315391,1661,373,306,jogo e setor,False
+Amostra,"E2, unidades com 200+ ingressos",-0.075094,0.217656,-0.502387,0.352199,1382,354,283,jogo e setor,False
+Amostra,"E2, setores com >= 3 observações",-0.48512,0.25038,-0.97626,0.00602,2023,369,186,jogo e setor,False
+Amostra,"E2, setores com >= 5 observações",-0.528565,0.253957,-1.026744,-0.030387,1895,349,150,jogo e setor,True
+Amostra,"E2, sem ocupação aparente >= 0,90",-0.811394,0.293297,-1.386833,-0.235955,1765,364,215,jogo e setor,True
+Mandante,"E2, sem os quatro grandes",-0.646717,0.390163,-1.412882,0.119448,1094,277,182,jogo e setor,False
+Mandante,"E2, só os quatro grandes",-0.230647,0.353445,-0.924372,0.463077,1118,110,155,jogo e setor,False
+Temporada,"E3, E2 em 2023",-1.191207,0.67462,-2.518135,0.13572,630,109,179,jogo e setor,False
+Temporada,"E3, E2 em 2024",-1.169904,0.85566,-2.853158,0.51335,602,104,169,jogo e setor,False
+Temporada,"E3, E2 em 2025",-0.320816,0.355766,-1.020463,0.378831,593,103,131,jogo e setor,False
+Temporada,"E3, E2 em 2026",0.266532,0.742923,-1.199056,1.73212,387,71,129,jogo e setor,False
+Receita,"E2, dependente = log(arrecadação do setor)",0.447802,0.265258,-0.072517,0.968121,2212,387,337,jogo e setor,False
