@@ -7,16 +7,26 @@ Arquivos que o parser não consegue ler até TOTAIS são abortados e listados.
 
 Lacuna conhecida: 2025_57 fica fora da base (ver LACUNAS_CONHECIDAS).
 
+Os dois arquivos versionados (boletins.csv e
+referencias/razao_categoria_inteira.csv) são gravados primeiro em arquivo
+temporário e só substituem os versionados depois da verificação de
+completude: nenhum abortado fora das lacunas conhecidas, CSV com dados e
+tabela de razão não vazia. Se a verificação falhar, os versionados ficam
+intactos e o script termina com código de saída 1.
+
 No fim imprime o relatório do lote: arquivos lidos, abortados, falhas de
 validação, linhas descartadas, rótulos em revisão, setores distintos,
 distribuição por regime e número de jogos distintos.
 
 Uso, a partir da raiz do repositório:
     python scripts/03_lote_boletins.py
+    python scripts/03_lote_boletins.py --pasta-raw outro/diretorio
 """
 
+import argparse
 import csv
 import importlib.util
+import os
 import sys
 from collections import Counter, defaultdict
 from decimal import Decimal
@@ -137,13 +147,48 @@ def padronizar(registros, clubes, estadios):
     return sem
 
 
+def gravar_csv(caminho, linhas, colunas):
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    with open(caminho, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=colunas, lineterminator="\n")
+        w.writeheader()
+        w.writerows(linhas)
+
+
+def contar_linhas(caminho):
+    with open(caminho, encoding="utf-8") as f:
+        return sum(1 for _ in f)
+
+
+def verificar_completude(esperados, abortados, tmp_base, tmp_razao):
+    """Motivos para NÃO substituir os arquivos versionados. Lista vazia: ok."""
+    motivos = []
+    desconhecidos = [nome for nome, _ in abortados if nome not in LACUNAS_CONHECIDAS]
+    if len(abortados) > len(LACUNAS_CONHECIDAS):
+        motivos.append(f"{len(abortados)} boletins abortados; o máximo aceito é "
+                       f"{len(LACUNAS_CONHECIDAS)} (lacunas conhecidas)")
+    if desconhecidos:
+        amostra = ", ".join(desconhecidos[:5]) + (" ..." if len(desconhecidos) > 5 else "")
+        motivos.append(f"abortados fora das lacunas conhecidas: {amostra}")
+    if contar_linhas(tmp_base) <= 1:
+        motivos.append(f"{tmp_base.name} só tem o cabeçalho")
+    if contar_linhas(tmp_razao) <= 1:
+        motivos.append(f"{tmp_razao.name} só tem o cabeçalho")
+    return motivos
+
+
 def pct(parte, todo):
     return f"{100 * parte / todo:.1f}" if todo else "-"
 
 
-def main():
+def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+    args_parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    args_parser.add_argument("--pasta-raw", type=Path, default=PASTA_RAW,
+                             help="diretório com os PDFs por ano (padrão: data/01_raw)")
+    args = args_parser.parse_args(argv)
+    pasta_raw = args.pasta_raw
     categorias = parser.carregar_categorias()
 
     registros, abortados = [], []
@@ -165,7 +210,7 @@ def main():
 
     for ano, n in JOGOS_POR_ANO.items():
         for jogo in range(1, n + 1):
-            arq = PASTA_RAW / str(ano) / f"{ano}_{jogo}.pdf"
+            arq = pasta_raw / str(ano) / f"{ano}_{jogo}.pdf"
             try:
                 r = parser.processar(arq, categorias)
             except Exception as e:
@@ -243,13 +288,26 @@ def main():
     print(f"Estádios sem correspondência em referencias/estadios.csv: {sorted(sem['estadio']) or 'nenhum'}")
     print()
 
-    SAIDA.parent.mkdir(parents=True, exist_ok=True)
-    with open(SAIDA, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=COLUNAS_CSV, lineterminator="\n")
-        w.writeheader()
-        w.writerows(registros)
-
+    # Grava em temporário e só substitui o versionado depois da verificação.
     esperados = sum(JOGOS_POR_ANO.values())
+    tabela = tabela_razao(linhas_por_jogo)
+    tmp_base = SAIDA.with_name(SAIDA.name + ".tmp")
+    tmp_razao = SAIDA_RAZAO.with_name(SAIDA_RAZAO.name + ".tmp")
+    gravar_csv(tmp_base, registros, COLUNAS_CSV)
+    gravar_csv(tmp_razao, tabela, list(tabela[0]) if tabela else ["categoria"])
+    motivos = verificar_completude(esperados, abortados, tmp_base, tmp_razao)
+    if motivos:
+        tmp_base.unlink(missing_ok=True)
+        tmp_razao.unlink(missing_ok=True)
+        print(f"Arquivos esperados: {esperados}. Processados até o fim: {esperados - len(abortados)}. "
+              f"Abortados: {len(abortados)}.")
+        print("NADA FOI SUBSTITUÍDO. Os arquivos versionados continuam como estavam:")
+        for m in motivos:
+            print(f"  - {m}")
+        sys.exit(1)
+    os.replace(tmp_base, SAIDA)
+    os.replace(tmp_razao, SAIDA_RAZAO)
+
     jogos = {(r["ano"], r["jogo"]) for r in registros}
     print(f"Arquivos esperados: {esperados}")
     print(f"Processados até o fim: {esperados - len(abortados)}")
@@ -293,11 +351,6 @@ def main():
     mercado_livre = [r for r in registros if r["regime"] == "mercado" and not r["preco_regulado"]]
     print(f"Regime mercado com preco_regulado False: {len(mercado_livre)} linhas, "
           f"{sum(r['vendidos'] for r in mercado_livre):,.0f} ingressos")
-    tabela = tabela_razao(linhas_por_jogo)
-    with open(SAIDA_RAZAO, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(tabela[0]), lineterminator="\n")
-        w.writeheader()
-        w.writerows(tabela)
     print(f"Razão categoria / Inteira, gravada em {SAIDA_RAZAO.relative_to(RAIZ)}:")
     for t in tabela:
         print("  " + " | ".join(str(v) for v in t.values()))
