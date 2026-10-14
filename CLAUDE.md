@@ -26,8 +26,9 @@ deve ser reportado como tal.
 - Chaves de junção com nomes de clube passam por dicionário de padronização
   explícito. Qualquer nome que não casar é listado, não descartado em
   silêncio.
-- Dado bruto nunca é editado no lugar. Fluxo é `01_raw` → `02_interim` →
-  `03_processed`, sem volta.
+- Dado bruto nunca é editado no lugar. Fluxo é `01_raw` → `03_processed`,
+  sem volta. Não há camada `02_interim`: o lote grava direto em
+  `03_processed`.
 
 ## Validação estatística
 
@@ -60,7 +61,7 @@ deve ser reportado como tal.
 
 ## Código
 
-- Python. pandas, NumPy, SciPy, scikit-learn, Matplotlib, pdfplumber.
+- Python. pandas, NumPy, Matplotlib, pdfplumber, linearmodels.
 - Notebooks numerados por etapa, um arquivo por etapa, nomes descritivos.
 - Caminhos relativos. Nada de caminho absoluto da máquina local.
 - Dado bruto pesado não vai para o repositório. `.gitignore` configurado.

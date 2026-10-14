@@ -5,12 +5,17 @@
 Gerado por `python scripts/03_lote_boletins.py` a partir dos PDFs em
 `data/01_raw`. Uma linha por linha da tabela de setores de cada boletim do
 Paulistão A1, 2023 a 2026. A linha TOTAIS não entra. Linhas vazias do
-formulário são descartadas.
+formulário são descartadas. O lote só substitui este arquivo depois de
+verificar que nenhum boletim fora das lacunas conhecidas abortou; se a
+verificação falhar, o arquivo fica como estava e o script sai com código 1.
 
 | Coluna | Conteúdo |
 |---|---|
 | ano, jogo | Temporada e número do jogo no boletim da FPF |
-| boletim, mandante, visitante, data, horario, estadio, cidade, uf, competicao | Cabeçalho do boletim |
+| boletim, data, horario, uf, competicao | Cabeçalho do boletim |
+| mandante_boletim, visitante_boletim, estadio_boletim, cidade_boletim | Texto do cabeçalho como sai do boletim |
+| mandante, visitante | Clube padronizado por `referencias/clubes.csv` |
+| estadio, cidade | Estádio e cidade padronizados por `referencias/estadios.csv` |
 | rotulo | Texto da coluna LOCALIDADES como sai do PDF, com rótulos quebrados em duas linhas já juntados |
 | setor | Parte do rótulo antes do subtipo e da categoria |
 | subtipo | Faixa de produto ou condição do comprador entre setor e categoria (ex.: Geral, Carnê, Cativa, Visitante, P.C.D.). Vazio quando não há |
@@ -23,7 +28,7 @@ formulário são descartadas.
 | preco | Preço unitário impresso no boletim, ou derivado (ver preco_derivado) |
 | preco_derivado | Verdadeiro quando o boletim imprime R$ 0,00 com arrecadação positiva (Fiel Torcedor). Nesse caso preco = arrecadação / vendidos, arredondado a centavos. É preço médio da linha, não preço de tabela |
 | preco_quebrado | Detector: preço com centavos diferentes de 00, fora os derivados. Só marca; nada é reclassificado por causa dele |
-| preco_regulado | Verdadeiro quando o preço é fração fixa da Inteira ou vem de obrigação legal ou de acessibilidade: categorias marcadas no dicionário (Meia, Meia Promocional, PCR, Menor, Meia legal, Acompanhante, Solidário), categoria de lei com preço acima de zero e subtipo P.C.D. Ver "Preço regulado" abaixo |
+| preco_regulado | Verdadeiro quando o preço é fração fixa da Inteira ou vem de obrigação legal ou de acessibilidade: categorias marcadas no dicionário (Meia, Meia Promocional, PCR, Menor, Meia legal, Acompanhante, Solidário, Meia Social, Meia Solidária), categoria de lei com preço acima de zero e subtipo P.C.D. Ver "Preço regulado" abaixo |
 | meia_fora_da_metade | Só para categoria Meia. Verdadeiro quando o preço difere em mais de R$ 0,01 da metade da Inteira de mercado do mesmo setor e mesmo subtipo (sem ela, da Inteira do setor sem subtipo). Falso quando bate. Vazio quando não há essa Inteira no jogo |
 | arrecadacao | Arrecadação da linha |
 | linha_fecha | vendidos x preço = arrecadação. Comparação exata para preço impresso; para preço derivado, tolerância de vendidos x 0,005, por causa do arredondamento a centavos |
@@ -99,38 +104,54 @@ regime segue a categoria.
 
 ## Preço regulado
 
-No regime mercado, só Inteira, Meia Social e Meia Solidária ficam com
-`preco_regulado` falso. As demais categorias de mercado são a Inteira
+No regime mercado, só a Inteira fica com `preco_regulado` falso. As demais categorias de mercado são a Inteira
 multiplicada por uma constante: não contêm variação de preço própria, e
 incluí-las no modelo mediria desconto legal em vez de comportamento.
 
-A evidência é medida na base, não suposta: a razão entre o preço de cada
-categoria e a Inteira do mesmo setor, mesmo subtipo e mesmo jogo, em
+A evidência é medida na base, não suposta:
 `referencias/razao_categoria_inteira.csv` (gerada por
-`scripts/03_lote_boletins.py`).
+`scripts/03_lote_boletins.py`) traz a razão entre o preço de cada categoria
+de mercado e a Inteira de mercado do mesmo setor e jogo (mesmo subtipo, ou
+sem subtipo quando não há), calculada **antes** da guarda da meia-entrada,
+com a coluna `situacao` dizendo onde a linha terminou (mercado, revisão ou
+outro regime pelo subtipo). A Inteira não entra: é a referência. A razão
+sobre a Meia não é calculada para a própria Meia, pelo mesmo motivo.
 
-| Categoria | Observações | Ingressos | % exatamente metade | Razão mediana | Mínima | Máxima |
-|---|---|---|---|---|---|---|
-| Inteira | 2.335 | 898.596 | 0,0 | 1,0000 | 1,0000 | 1,0000 |
-| Meia | 2.126 | 1.085.246 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
-| Meia Promocional | 54 | 13.916 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
-| PCR | 31 | 290 | 96,8 | 0,5000 | 0,5000 | 1,0000 |
-| Acompanhante | 16 | 1.019 | 0,0 | 1,0000 | 1,0000 | 1,0000 |
-| Meia Social | 10 | 16.870 | 0,0 | 0,5503 | 0,2462 | 0,5633 |
-| Solidário | 10 | 4.155 | 0,0 | 0,5506 | 0,5505 | 0,5506 |
-| Meia Solidária | 3 | 1.781 | 0,0 | 0,5546 | 0,5505 | 0,8283 |
-| Menor | 1 | 1.201 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
-| Meia legal | 1 | 368 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
+| Categoria | Situação | Observações | Ingressos | % exatamente metade | Razão mediana | Mínima | Máxima |
+|---|---|---|---|---|---|---|---|
+| Meia | mercado | 2.140 | 1.087.340 | 99,9 | 0,5000 | 0,3333 | 0,5000 |
+| Meia | contrato | 20 | 2.211 | 15,0 | 0,2500 | 0,2258 | 0,5000 |
+| Meia | revisão | 6 | 2.693 | 0,0 | 0,4372 | 0,2236 | 0,8405 |
+| Meia Promocional | mercado | 54 | 13.916 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
+| PCR | mercado | 31 | 290 | 96,8 | 0,5000 | 0,5000 | 1,0000 |
+| Acompanhante | mercado | 16 | 1.019 | 0,0 | 1,0000 | 1,0000 | 1,0000 |
+| Meia Social | mercado | 10 | 16.870 | 0,0 | 0,5503 | 0,2462 | 0,5633 |
+| Solidário | mercado | 10 | 4.155 | 0,0 | 0,5506 | 0,5505 | 0,5506 |
+| Meia Solidária | mercado | 3 | 1.781 | 0,0 | 0,5546 | 0,5505 | 0,8283 |
+| Meia legal | mercado | 1 | 368 | 100,0 | 0,5000 | 0,5000 | 0,5000 |
+| Meia legal | gratuidade | 1 | 7 | 0,0 | 0,0000 | 0,0000 | 0,0000 |
+| Menor | mercado | 2 | 1.502 | 50,0 | 0,7500 | 0,5000 | 1,0000 |
+
+Antes da guarda, 2.166 Meias têm Inteira de referência, e 26 (1,2%) não
+são exatamente metade: 17 de cadeira cativa (regime contrato pelo
+subtipo), 6 que a guarda manda para revisão e 3 de P.C.D. que ficam em
+mercado. Entre as Meias que ficaram em mercado, o 99,9% é em parte
+consequência da própria guarda.
 
 Ressalvas da medição:
 
-- **Meia Solidária não é fração fixa na base.** São 5 linhas, todas de
-  2025_63 (Água Santa), 3 com Inteira de referência. As razões são 0,5505,
-  0,5546 e 0,8283. Fica com `preco_regulado` falso até decisão.
-- **Menor e Meia legal têm uma observação cada.** Menor de 2023_2 não
-  entra na medição, porque o setor não tem Inteira com o mesmo subtipo
-  (Promoção); o preço dela é igual à Inteira sem subtipo (ver
-  Inconsistências).
+- **Meia Social e Meia Solidária são a Meia vezes 1,10** (taxa de
+  conveniência), por isso têm `preco_regulado` verdadeiro, como as 10
+  linhas de Meia Social e as 5 de Meia Solidária na base. Sobre a Meia do
+  mesmo setor e subtipo, Meia Social fica entre 1,1005 e 1,1266 em 6 de
+  10 linhas; as 4 exceções estão em CADEIRA HOSPITALITY OESTE de 2024_40,
+  de preço escalonado. Meia Solidária tem uma só linha com Meia de
+  referência (1,1092). Sobre a Inteira, Meia Solidária vai de 0,5505 a
+  0,8283 (3 linhas com Inteira de referência, todas de 2025_63).
+- **Menor tem duas observações**: 2025_11 a 0,50 da Inteira e 2023_2 igual
+  à Inteira sem subtipo do setor (ver Inconsistências). **Meia legal** tem
+  uma observação em mercado; a outra, de 2026_68 a R$ 0,00, foi para
+  gratuidade.
 - **PCR** tem uma observação a 1,0 (2024_48, B- GOL, R$ 60 com Inteira a
   R$ 60).
 

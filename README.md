@@ -33,20 +33,38 @@ A pergunta deste projeto é como a demanda por ingresso responde ao preço.
 
 O boletim financeiro de cada partida fica em URL determinística no site da
 FPF. A coleta (`scripts/01_coleta_boletins.py`) baixou os 389 boletins das
-temporadas 2023 (109 jogos), 2024 (104), 2025 (104) e 2026 (72). Os PDFs
-ficam fora do repositório.
+temporadas 2023 (109 jogos), 2024 (104), 2025 (104) e 2026 (72). Os PDFs da
+coleta ficam fora do repositório; quatro boletins ficam versionados em
+`tests/fixtures/` para os testes (ver Fonte e direitos).
 
 ### Extração e validação
 
 O parser (`scripts/02_parser_boletim.py`) lê o PDF por palavras com
 coordenadas e atribui cada valor à coluna cujo cabeçalho está mais
-próximo. Cada linha passa pela conferência aritmética vendidos x preço =
-arrecadação, e a soma das linhas é conferida com a linha TOTAIS do
-boletim. O lote (`scripts/03_lote_boletins.py`) processou 388 boletins até
-o fim, com zero falha nas duas conferências, e gravou 12.241 linhas em
-`data/03_processed/boletins.csv`. Um boletim, 2025_57, ficou fora (ver
-Limitações). Há testes de regressão em `tests/`, incluindo um gabarito
-lido à mão do boletim 2026_72.
+próximo. O lote (`scripts/03_lote_boletins.py`) processou 388 boletins até
+o fim e gravou 12.241 linhas em `data/03_processed/boletins.csv`. Um
+boletim, 2025_57, ficou fora (ver Limitações).
+
+Duas conferências rodam em todo boletim, e nenhuma falhou. O que elas
+garantem é menos do que o nome sugere:
+
+- **Linha contra TOTAIS.** A soma das linhas bate com a linha TOTAIS do
+  boletim. Como linhas e TOTAIS são lidos pela mesma regra de proximidade
+  de coluna, um deslocamento igual nos dois passaria. A conferência garante
+  ausência de deslocamento assimétrico entre linhas e totais, não que a
+  coluna esteja certa.
+- **Vendidos x preço = arrecadação.** Só é informativa onde preço e
+  quantidade são positivos e o preço é impresso: 11.484 das 12.241 linhas.
+  Em 673 linhas (5,5%), todas de gratuidade, o preço é zero e a conta é
+  0 = 0. Em 84 linhas de Fiel Torcedor o preço é derivado da própria
+  arrecadação, e a tolerância aceita é o limite do arredondamento a
+  centavos, então ali a conferência não pode falhar.
+- **A venda - devolvidos = vendidos** é trivial na base: devolvidos é zero
+  nas 12.241 linhas, e a venda é igual a vendidos em todas.
+
+Há testes de regressão em `tests/`, incluindo um gabarito lido à mão do
+boletim 2026_72 que cobre vendidos, a venda, devolvidos, preço e
+arrecadação de cada linha, e testes de unidade da geometria do parser.
 
 ### Classificação
 
@@ -56,29 +74,52 @@ sócio, contrato, gratuidade, não vendido ou promocional. Nome de clube e
 de estádio também passam por dicionário. Nenhum rótulo, clube ou estádio
 fica sem correspondência.
 
-A razão entre o preço de cada categoria de mercado e a Inteira do mesmo
-setor, subtipo e jogo (`referencias/razao_categoria_inteira.csv`) mostra
-que quase toda categoria de mercado é a Inteira multiplicada por uma
-constante:
+A tabela `referencias/razao_categoria_inteira.csv` mede a razão entre o
+preço de cada categoria de mercado e a Inteira de mercado do mesmo setor e
+jogo (do mesmo subtipo, ou sem subtipo quando não há), **antes** da guarda
+que tira de mercado a Meia fora da metade. A coluna de situação diz onde a
+linha terminou. A Inteira não entra na tabela: é a referência, e
+compará-la consigo mesma daria 1 por construção.
 
-| Categoria | Observações | Razão mediana sobre a Inteira | Mínima | Máxima |
-|---|---|---|---|---|
-| Meia | 2.126 | 0,500 | 0,500 | 0,500 |
-| Meia Promocional | 54 | 0,500 | 0,500 | 0,500 |
-| PCR | 31 | 0,500 | 0,500 | 1,000 |
-| Acompanhante | 16 | 1,000 | 1,000 | 1,000 |
-| Solidário | 10 | 0,551 | 0,551 | 0,551 |
-| Meia Social | 10 | 0,550 | 0,246 | 0,563 |
-| Meia Solidária | 3 | 0,555 | 0,551 | 0,828 |
-| Menor | 1 | 0,500 | 0,500 | 0,500 |
-| Meia legal | 1 | 0,500 | 0,500 | 0,500 |
+| Categoria | Situação final | Observações | % exatamente metade | Razão mediana sobre a Inteira | Mínima | Máxima |
+|---|---|---|---|---|---|---|
+| Meia | mercado | 2.140 | 99,9 | 0,500 | 0,333 | 0,500 |
+| Meia | contrato (subtipo Cativa) | 20 | 15,0 | 0,250 | 0,226 | 0,500 |
+| Meia | revisão | 6 | 0,0 | 0,437 | 0,224 | 0,841 |
+| Meia Promocional | mercado | 54 | 100,0 | 0,500 | 0,500 | 0,500 |
+| PCR | mercado | 31 | 96,8 | 0,500 | 0,500 | 1,000 |
+| Acompanhante | mercado | 16 | 0,0 | 1,000 | 1,000 | 1,000 |
+| Meia Social | mercado | 10 | 0,0 | 0,550 | 0,246 | 0,563 |
+| Solidário | mercado | 10 | 0,0 | 0,551 | 0,551 | 0,551 |
+| Meia Solidária | mercado | 3 | 0,0 | 0,555 | 0,551 | 0,828 |
+| Menor | mercado | 2 | 50,0 | 0,750 | 0,500 | 1,000 |
+| Meia legal | mercado | 1 | 100,0 | 0,500 | 0,500 | 0,500 |
+| Meia legal | gratuidade | 1 | 0,0 | 0,000 | 0,000 | 0,000 |
 
-O fator 0,55 é a Meia acrescida de 10% de taxa de conveniência. As
-exceções são poucas: 4 linhas de Meia Social em um setor de preço
-escalonado de 2024_40, uma linha de PCR igual à Inteira e uma de Meia
-Solidária a 0,83 da Inteira. Com isso, a decisão de preço do clube em cada
-setor é unidimensional: o preço da Inteira. As demais categorias seguem a
-Inteira por lei ou por regra fixa e são marcadas como `preco_regulado`.
+Antes da guarda, 2.166 Meias têm Inteira de referência. 2.140 (98,8%)
+custam exatamente metade, com tolerância de R$ 0,01. As 26 restantes vão
+de 0,224 a 0,841 da Inteira:
+
+- 17 são Meia de cadeira cativa, que o subtipo já põe no regime contrato;
+- 6 saem de mercado pela guarda e ficam em revisão (`revisao_meia`), com
+  2.693 ingressos, entre elas a Meia patrocinada de 2024_44 a R$ 20 sobre
+  Inteira de R$ 30 e quatro Meias escalonadas de 2024_40;
+- 3 são P.C.D. - Meia do Palmeiras, que ficam em mercado como preço de
+  acessibilidade.
+
+Das Meias que ficaram em mercado, 2.137 de 2.140 são exatamente metade; as
+3 restantes são as de P.C.D. O 99,9% da tabela, portanto, é em parte
+consequência da guarda, e a dispersão real antes dela é a dos 2.166.
+
+As outras categorias de mercado também são a Inteira vezes uma constante
+(1,00 para Acompanhante, 0,50 para Meia Promocional e PCR), ou a Meia
+acrescida de 10% de taxa de conveniência (Meia Social e Solidário, cerca
+de 0,55 da Inteira e de 1,10 da Meia). As exceções: 4 linhas de Meia
+Social num setor de preço escalonado de 2024_40, uma de PCR igual à
+Inteira, uma de Meia Solidária a 0,83 e uma de Menor igual à Inteira
+(2023_2). Com isso, a decisão de preço do clube em cada setor é
+unidimensional: o preço da Inteira. As demais categorias seguem a Inteira
+por lei ou por regra fixa e são marcadas como `preco_regulado`.
 
 ### Unidade e modelo
 
@@ -284,6 +325,32 @@ que o clube cobra pouco.
 | `figuras/` | Gráficos gerados pelos notebooks |
 | `tests/` | Testes de regressão do parser e do lote |
 | `requirements.txt` | Pacotes e versões usados |
+| `LICENSE` | Licença MIT do código |
+
+## Fonte e direitos
+
+Os boletins são da Federação Paulista de Futebol, baixados da URL
+determinística
+`https://conteudo.fpf.org.br/Competicoes/{ANO}/3973/boletins-financeiros/{N}/boletins/{N}.pdf`,
+em que 3973 é o identificador do Paulistão A1 e N é o número do jogo. A
+coleta foi feita em 10/10/2026.
+
+A FPF não concedeu licença para este uso, e os termos de uso do site não
+foram verificados.
+
+O código deste repositório é licenciado sob MIT (`LICENSE`). A contribuição
+do autor sobre os dados derivados (a base processada em
+`data/03_processed/`, os dicionários e tabelas em `referencias/`, os
+gráficos e o texto) é licenciada sob CC BY 4.0. Nenhuma das duas licenças
+cobre o conteúdo original dos boletins da FPF, cujos direitos continuam da
+FPF.
+
+`tests/fixtures/` contém quatro boletins oficiais completos (2023_55,
+2024_52, 2025_78 e 2026_72), um por temporada. Eles ficam versionados
+porque os testes de regressão precisam de PDFs reais: cobrem a tabela em
+várias páginas, linhas vazias do formulário, categorias como PCR e Cativa
+e o gabarito lido à mão de 2026_72. Os demais PDFs da coleta não estão no
+repositório.
 
 ## Como reproduzir
 
@@ -307,7 +374,10 @@ python -m unittest discover tests
    o que já está em disco e registra falhas sem interromper.
 2. `03_lote_boletins.py` roda o parser em todos os boletins, grava
    `data/03_processed/boletins.csv` e `referencias/razao_categoria_inteira.csv`
-   e imprime o relatório do lote.
+   e imprime o relatório do lote. Os dois arquivos só são substituídos se
+   nenhum boletim fora da lacuna conhecida (2025_57) abortar; sem os PDFs em
+   disco, ou com a coleta incompleta, o lote não toca nos arquivos
+   versionados e termina com código de saída 1.
 3. Os testes conferem o gabarito de 2026_72, os fixtures em
    `tests/fixtures/` e a padronização do CSV.
 4. Depois, abra e execute os notebooks em ordem, num ambiente Jupyter:

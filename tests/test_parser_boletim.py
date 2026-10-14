@@ -5,6 +5,7 @@ Uso, a partir da raiz do repositório:
 """
 
 import importlib.util
+import sys
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -24,27 +25,28 @@ lote = importlib.util.module_from_spec(_spec_lote)
 _spec_lote.loader.exec_module(lote)
 
 # Gabarito lido à mão do boletim 72/2026, Grêmio Novorizontino x Palmeiras,
-# 08/03/2026: (setor, categoria, vendidos, preço, arrecadação).
+# 08/03/2026: (setor, categoria, a venda, devolvidos, vendidos, preço,
+# arrecadação).
 GABARITO_2026_72 = [
-    ("ARQUIBANCADA COBERTA", "Inteira", "33", "280.00", "9240.00"),
-    ("ARQUIBANCADA COBERTA", "Sócio", "47", "20.00", "940.00"),
-    ("ARQUIBANCADA COBERTA", "Gratuidade legal", "28", "0.00", "0.00"),
-    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Inteira", "1682", "130.00", "218660.00"),
-    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Meia", "611", "65.00", "39715.00"),
-    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Sócio", "486", "20.00", "9720.00"),
-    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Gratuidade legal", "985", "0.00", "0.00"),
-    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Inteira", "1725", "250.00", "431250.00"),
-    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Meia", "615", "125.00", "76875.00"),
-    ("ARQUIBANCADA INFERIOR", "Inteira", "112", "250.00", "28000.00"),
-    ("ARQUIBANCADA INFERIOR", "Meia", "252", "125.00", "31500.00"),
-    ("ARQUIBANCADA INFERIOR", "Sócio", "266", "20.00", "5320.00"),
-    ("ARQUIBANCADA INFERIOR", "Gratuidade legal", "300", "0.00", "0.00"),
-    ("CAMAROTES", "Carnê de Relacionamento", "27", "20.00", "540.00"),
-    ("CATIVAS SÓCIOS", "Sócio", "251", "20.00", "5020.00"),
-    ("CATIVAS SÓCIOS", "Gratuidade legal", "124", "0.00", "0.00"),
-    ("SETOR B*", "Inteira", "1791", "250.00", "447750.00"),
-    ("SETOR B*", "Meia", "316", "125.00", "39500.00"),
-    ("SETOR B*", "Gratuidade legal", "251", "0.00", "0.00"),
+    ("ARQUIBANCADA COBERTA", "Inteira", "33", "0", "33", "280.00", "9240.00"),
+    ("ARQUIBANCADA COBERTA", "Sócio", "47", "0", "47", "20.00", "940.00"),
+    ("ARQUIBANCADA COBERTA", "Gratuidade legal", "28", "0", "28", "0.00", "0.00"),
+    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Inteira", "1682", "0", "1682", "130.00", "218660.00"),
+    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Meia", "611", "0", "611", "65.00", "39715.00"),
+    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Sócio", "486", "0", "486", "20.00", "9720.00"),
+    ("ARQUIBANCADA GERAL - GERAIS LOCAL", "Gratuidade legal", "985", "0", "985", "0.00", "0.00"),
+    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Inteira", "1725", "0", "1725", "250.00", "431250.00"),
+    ("ARQUIBANCADA GERAL - GERAL CENTRAL", "Meia", "615", "0", "615", "125.00", "76875.00"),
+    ("ARQUIBANCADA INFERIOR", "Inteira", "112", "0", "112", "250.00", "28000.00"),
+    ("ARQUIBANCADA INFERIOR", "Meia", "252", "0", "252", "125.00", "31500.00"),
+    ("ARQUIBANCADA INFERIOR", "Sócio", "266", "0", "266", "20.00", "5320.00"),
+    ("ARQUIBANCADA INFERIOR", "Gratuidade legal", "300", "0", "300", "0.00", "0.00"),
+    ("CAMAROTES", "Carnê de Relacionamento", "27", "0", "27", "20.00", "540.00"),
+    ("CATIVAS SÓCIOS", "Sócio", "251", "0", "251", "20.00", "5020.00"),
+    ("CATIVAS SÓCIOS", "Gratuidade legal", "124", "0", "124", "0.00", "0.00"),
+    ("SETOR B*", "Inteira", "1791", "0", "1791", "250.00", "447750.00"),
+    ("SETOR B*", "Meia", "316", "0", "316", "125.00", "39500.00"),
+    ("SETOR B*", "Gratuidade legal", "251", "0", "251", "0.00", "0.00"),
 ]
 
 
@@ -64,13 +66,15 @@ class TestGabarito2026_72(unittest.TestCase):
         self.assertEqual(cab["competicao"], "Paulista - A1- Profissional")
 
     def test_linhas(self):
-        obtido = [(l["setor"], l["categoria"], l["VENDIDOS"], l["PREÇO"], l["ARRECADAÇÃO"])
-                  for l in self.r["linhas"]]
-        esperado = [(s, c, Decimal(v), Decimal(p), Decimal(a))
-                    for s, c, v, p, a in GABARITO_2026_72]
+        obtido = [(l["setor"], l["categoria"], l["A VENDA"], l["DEVOLVIDOS"], l["VENDIDOS"],
+                   l["PREÇO"], l["ARRECADAÇÃO"]) for l in self.r["linhas"]]
+        esperado = [(s, c, Decimal(av), Decimal(dv), Decimal(v), Decimal(p), Decimal(a))
+                    for s, c, av, dv, v, p, a in GABARITO_2026_72]
         self.assertEqual(obtido, esperado)
 
     def test_totais(self):
+        self.assertEqual(self.r["totais"]["A VENDA"], Decimal("9902"))
+        self.assertEqual(self.r["totais"]["DEVOLVIDOS"], Decimal("0"))
         self.assertEqual(self.r["totais"]["VENDIDOS"], Decimal("9902"))
         self.assertEqual(self.r["totais"]["ARRECADAÇÃO"], Decimal("1344030.00"))
 
@@ -398,6 +402,248 @@ class TestPadronizacaoNoCSV(unittest.TestCase):
         sem = lote.padronizar(r, self.clubes, self.estadios)
         self.assertEqual(sem, {"clube": {"Clube X"}, "estadio": {"Estádio Y"}})
         self.assertEqual((r[0]["mandante"], r[0]["visitante"], r[0]["estadio"]), ("", "Santos", ""))
+
+
+class TestLoteNaoSobrescreveBaseIncompleta(unittest.TestCase):
+    """Rodar o lote sem os PDFs (ou com poucos) não pode tocar nos arquivos
+    versionados e tem que sair com código diferente de zero."""
+
+    ARQUIVOS = [RAIZ / "data" / "03_processed" / "boletins.csv",
+                RAIZ / "referencias" / "razao_categoria_inteira.csv"]
+
+    def rodar_lote(self, pasta_raw):
+        import hashlib
+        import subprocess
+        antes = {p: hashlib.sha1(p.read_bytes()).hexdigest() for p in self.ARQUIVOS}
+        r = subprocess.run([sys.executable, str(RAIZ / "scripts" / "03_lote_boletins.py"),
+                            "--pasta-raw", str(pasta_raw)],
+                           capture_output=True, text=True, encoding="utf-8")
+        depois = {p: hashlib.sha1(p.read_bytes()).hexdigest() for p in self.ARQUIVOS}
+        self.assertNotEqual(r.returncode, 0, r.stdout[-2000:])
+        self.assertEqual(antes, depois)
+        for p in self.ARQUIVOS:
+            self.assertFalse(p.with_name(p.name + ".tmp").exists())
+        return r
+
+    def test_diretorio_de_pdfs_vazio(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as vazio:
+            r = self.rodar_lote(vazio)
+        self.assertIn("NADA FOI SUBSTITUÍDO", r.stdout)
+
+    def test_poucos_pdfs_presentes(self):
+        import shutil
+        import tempfile
+        with tempfile.TemporaryDirectory() as pasta:
+            for pdf in FIXTURES.glob("*.pdf"):
+                destino = Path(pasta) / pdf.stem[:4]
+                destino.mkdir(exist_ok=True)
+                shutil.copy(pdf, destino / pdf.name)
+            r = self.rodar_lote(pasta)
+        self.assertIn("385 boletins abortados", r.stdout)
+
+
+class TestColeta(unittest.TestCase):
+    def test_transferencia_cortada_vira_falha_sem_interromper(self):
+        import http.client
+        import tempfile
+        from unittest import mock
+        spec = importlib.util.spec_from_file_location(
+            "coleta_boletins", RAIZ / "scripts" / "01_coleta_boletins.py")
+        coleta = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(coleta)
+        with tempfile.TemporaryDirectory() as pasta,                 mock.patch.object(coleta.urllib.request, "urlopen",
+                                  side_effect=http.client.IncompleteRead(b"parcial", 100)),                 mock.patch.object(coleta.time, "sleep"):
+            destino = Path(pasta) / "2026_1.pdf"
+            erro = coleta.baixar("https://exemplo.invalid/1.pdf", destino)
+            self.assertIn("IncompleteRead", erro)
+            self.assertFalse(destino.exists())
+            self.assertFalse(destino.with_suffix(".part").exists())
+
+
+def _palavra(texto, x0, top, largura=4.0):
+    """Palavra sintética no formato do pdfplumber, com os caracteres."""
+    chars = [{"text": ch, "x0": x0 + i * largura, "x1": x0 + (i + 1) * largura}
+             for i, ch in enumerate(texto)]
+    return {"text": texto, "x0": x0, "x1": x0 + len(texto) * largura, "top": top,
+            "bottom": top + 7, "chars": chars}
+
+
+# Cabeçalho sintético: centros de coluna em 362 (A VENDA), 400 (DEVOLVIDOS),
+# 441 (VENDIDOS), 480 (PREÇO) e 541 (ARRECADAÇÃO).
+CABECALHO = [_palavra("LOCALIDADES", 170, 100), _palavra("A", 347, 100),
+             _palavra("VENDA", 352, 100), _palavra("DEVOLVIDOS", 380, 100),
+             _palavra("VENDIDOS", 425, 100), _palavra("PREÇO", 470, 100),
+             _palavra("ARRECADAÇÃO", 519, 100)]
+
+
+def _linha_sintetica(rotulo, valores, top):
+    """Linha sintética: rótulo à esquerda e valores centrados nas colunas."""
+    palavras, x = [], 40.0
+    for pedaco in rotulo.split():
+        palavras.append(_palavra(pedaco, x, top))
+        x += len(pedaco) * 4 + 4
+    for texto, centro in valores:
+        palavras.append(_palavra(texto, centro - len(texto) * 2, top))
+    return palavras
+
+
+class TestGeometriaDoParser(unittest.TestCase):
+    """Testes de unidade das funções que fazem a leitura geométrica."""
+
+    def test_numero_br(self):
+        self.assertEqual(parser.numero_br("1.344.030,00"), Decimal("1344030.00"))
+        self.assertEqual(parser.numero_br("1682"), Decimal("1682"))
+        self.assertEqual(parser.numero_br("R$ 20,00"), Decimal("20.00"))
+        self.assertEqual(parser.numero_br("0,00"), Decimal("0.00"))
+        self.assertEqual(parser.numero_br("50,43"), Decimal("50.43"))
+
+    def test_agrupar_linhas_usa_tolerancia_e_ordena_por_x(self):
+        palavras = [_palavra("B", 200, 10.0), _palavra("A", 50, 11.5),
+                    _palavra("C", 50, 20.0)]
+        linhas = parser.agrupar_linhas(palavras)
+        self.assertEqual([[p["text"] for p in l] for l in linhas], [["A", "B"], ["C"]])
+
+    def test_agrupar_linhas_separa_alem_da_tolerancia(self):
+        palavras = [_palavra("A", 50, 10.0),
+                    _palavra("B", 60, 10.0 + parser.TOLERANCIA_LINHA + 0.5)]
+        self.assertEqual(len(parser.agrupar_linhas(palavras)), 2)
+
+    def test_centros_colunas(self):
+        centros = parser.centros_colunas(CABECALHO)
+        esperado = {"A VENDA": 362, "DEVOLVIDOS": 400, "VENDIDOS": 441,
+                    "PREÇO": 480, "ARRECADAÇÃO": 541}
+        for coluna, centro in esperado.items():
+            self.assertAlmostEqual(centros[coluna], centro, places=6)
+
+    def test_centros_colunas_com_titulos_colados(self):
+        # "A VENDADEVOLVIDOSVENDIDOS" numa palavra só, como em 2025_40.
+        colado = [_palavra("LOCALIDADES", 170, 100), _palavra("A", 347, 100),
+                  _palavra("VENDADEVOLVIDOSVENDIDOS", 352, 100),
+                  _palavra("PREÇO", 470, 100), _palavra("ARRECADAÇÃO", 519, 100)]
+        centros = parser.centros_colunas(colado)
+        self.assertAlmostEqual(centros["A VENDA"], 362, places=6)
+        self.assertAlmostEqual(centros["DEVOLVIDOS"], 392, places=6)
+        self.assertAlmostEqual(centros["VENDIDOS"], 428, places=6)
+
+    def test_centros_colunas_sem_coluna_levanta_erro(self):
+        with self.assertRaises(ValueError):
+            parser.centros_colunas(CABECALHO[:-1])
+
+    def test_extrair_tabela(self):
+        valores = lambda av, dv, v, p, a: [(av, 362), (dv, 400), (v, 441), ("R$", 462),
+                                            (p, 480), ("R$", 520), (a, 541)]
+        palavras = (CABECALHO
+                    + _linha_sintetica("SETOR A - Inteira", valores("10", "0", "10", "50,00", "500,00"), 112)
+                    + _linha_sintetica("SETOR A - Meia", valores("4", "0", "4", "25,00", "100,00"), 124)
+                    + [_palavra("S", 24, 124)]  # letra da margem esquerda
+                    + _linha_sintetica("", [("R$", 462), ("0,00", 480), ("R$", 520), ("0,00", 541)], 136)
+                    + _linha_sintetica("SETOR B - Carnê de", [], 148)
+                    + _linha_sintetica("", valores("3", "0", "3", "20,00", "60,00"), 152)
+                    + _linha_sintetica("Relacionamento", [], 156)
+                    + _linha_sintetica("Federação Paulista de Futebol", [], 168)
+                    + _linha_sintetica("TOTAIS", [("17", 362), ("0", 400), ("17", 441), ("660,00", 541)], 180))
+        paginas = [parser.agrupar_linhas(palavras)]
+        linhas, totais, margem, descartadas = parser.extrair_tabela(
+            paginas, parser.carregar_categorias())
+        self.assertEqual(descartadas, 1)
+        self.assertEqual(margem, ["S"])
+        self.assertEqual(
+            [(l["setor"], l["categoria"], l["A VENDA"], l["DEVOLVIDOS"], l["VENDIDOS"],
+              l["PREÇO"], l["ARRECADAÇÃO"]) for l in linhas],
+            [("SETOR A", "Inteira", Decimal("10"), Decimal("0"), Decimal("10"),
+              Decimal("50.00"), Decimal("500.00")),
+             ("SETOR A", "Meia", Decimal("4"), Decimal("0"), Decimal("4"),
+              Decimal("25.00"), Decimal("100.00")),
+             ("SETOR B", "Carnê de Relacionamento", Decimal("3"), Decimal("0"), Decimal("3"),
+              Decimal("20.00"), Decimal("60.00"))])
+        self.assertEqual((totais["A VENDA"], totais["VENDIDOS"], totais["ARRECADAÇÃO"]),
+                         (Decimal("17"), Decimal("17"), Decimal("660.00")))
+        self.assertEqual(parser.validar(linhas, totais), [])
+
+    def test_extrair_tabela_sem_totais_levanta_erro(self):
+        paginas = [parser.agrupar_linhas(
+            CABECALHO + _linha_sintetica("SETOR A - Inteira", [("10", 362), ("10", 441)], 112))]
+        with self.assertRaises(ValueError):
+            parser.extrair_tabela(paginas, parser.carregar_categorias())
+
+    def _linha_ok(self, **mudar):
+        l = {"rotulo": "SETOR A - Inteira", "A VENDA": Decimal("10"), "DEVOLVIDOS": Decimal("0"),
+             "VENDIDOS": Decimal("10"), "PREÇO": Decimal("50.00"),
+             "ARRECADAÇÃO": Decimal("500.00")}
+        l.update(mudar)
+        return l
+
+    def _totais(self, **mudar):
+        t = {"A VENDA": Decimal("10"), "DEVOLVIDOS": Decimal("0"), "VENDIDOS": Decimal("10"),
+             "ARRECADAÇÃO": Decimal("500.00")}
+        t.update(mudar)
+        return t
+
+    def test_validar_sem_problemas(self):
+        self.assertEqual(parser.validar([self._linha_ok()], self._totais()), [])
+
+    def test_validar_aritmetica_da_linha(self):
+        problemas = parser.validar([self._linha_ok(**{"ARRECADAÇÃO": Decimal("501.00")})],
+                                   self._totais(**{"ARRECADAÇÃO": Decimal("501.00")}))
+        self.assertEqual(len(problemas), 1)
+        self.assertIn("10 x 50.00", problemas[0])
+
+    def test_validar_preco_derivado_nao_e_conferido(self):
+        l = self._linha_ok(**{"ARRECADAÇÃO": Decimal("501.00")}, preco_derivado=True)
+        self.assertEqual(parser.validar([l], self._totais(**{"ARRECADAÇÃO": Decimal("501.00")})), [])
+
+    def test_validar_a_venda_menos_devolvidos(self):
+        l = self._linha_ok(**{"A VENDA": Decimal("12"), "DEVOLVIDOS": Decimal("1")})
+        problemas = parser.validar([l], self._totais(**{"A VENDA": Decimal("12"),
+                                                         "DEVOLVIDOS": Decimal("1")}))
+        self.assertEqual(problemas, ["linha 1 (SETOR A - Inteira): a venda - devolvidos = 11, vendidos = 10"])
+
+    def test_validar_totais(self):
+        problemas = parser.validar([self._linha_ok()], self._totais(VENDIDOS=Decimal("11")))
+        self.assertEqual(problemas, ["TOTAIS VENDIDOS: soma das linhas 10, boletim diz 11"])
+
+    def test_validar_coluna_ausente(self):
+        l = self._linha_ok()
+        del l["PREÇO"]
+        problemas = parser.validar([l], self._totais())
+        self.assertIn("colunas ausentes ['PREÇO']", problemas[0])
+
+
+class TestTabelaRazao(unittest.TestCase):
+    """tabela_razao: medida antes da guarda, com situação final, sem a Inteira."""
+
+    def linha(self, setor, categoria, preco, vendidos=10, regime="mercado", status="casado",
+              subtipo=None):
+        return {"setor": setor, "subtipo": subtipo, "categoria": categoria, "regime": regime,
+                "status": status, "PREÇO": Decimal(preco), "VENDIDOS": Decimal(vendidos)}
+
+    def test_inclui_linhas_expulsas_e_exclui_a_inteira(self):
+        jogo = [self.linha("A", "Inteira", "100"), self.linha("A", "Meia", "50"),
+                self.linha("B", "Inteira", "30"),
+                self.linha("B", "Meia", "20", regime=None, status="revisao_meia"),
+                self.linha("A", "Meia Social", "55")]
+        tabela = lote.tabela_razao([jogo], {"Meia", "Meia Social"})
+        por_chave = {(t["categoria"], t["situacao"]): t for t in tabela}
+        self.assertNotIn("Inteira", {t["categoria"] for t in tabela})
+        self.assertEqual(por_chave[("Meia", "mercado")]["razao_mediana"], "0.5000")
+        self.assertEqual(por_chave[("Meia", "mercado")]["pct_exatamente_metade"], "100.0")
+        self.assertEqual(por_chave[("Meia", "revisão")]["razao_mediana"], "0.6667")
+        self.assertEqual(por_chave[("Meia", "revisão")]["pct_exatamente_metade"], "0.0")
+        # Razão sobre a Meia só para as outras categorias.
+        self.assertEqual(por_chave[("Meia", "mercado")]["observacoes_sobre_meia"], 0)
+        self.assertEqual(por_chave[("Meia Social", "mercado")]["razao_meia_mediana"], "1.1000")
+
+    def test_referencia_cai_para_setor_sem_subtipo(self):
+        jogo = [self.linha("A", "Inteira", "100"),
+                self.linha("A", "Meia", "50", subtipo="P.C.D.")]
+        tabela = lote.tabela_razao([jogo], {"Meia"})
+        self.assertEqual(tabela[0]["observacoes"], 1)
+
+    def test_setor_com_dois_precos_de_inteira_fica_sem_referencia(self):
+        jogo = [self.linha("A", "Inteira", "100"), self.linha("A", "Inteira", "120"),
+                self.linha("A", "Meia", "50")]
+        self.assertEqual(lote.tabela_razao([jogo], {"Meia"}), [])
 
 
 if __name__ == "__main__":

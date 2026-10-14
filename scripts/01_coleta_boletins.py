@@ -11,6 +11,7 @@ Uso, a partir da raiz do repositório:
 """
 
 import argparse
+import http.client
 import time
 import urllib.error
 import urllib.request
@@ -29,7 +30,8 @@ ARQUIVO_LOG = PASTA_RAW / "coleta.log"
 
 TIMEOUT_S = 30
 TENTATIVAS = 3
-USER_AGENT = "bilheteria-paulistao/0.1 (pesquisa academica; coleta lenta)"
+USER_AGENT = ("bilheteria-paulistao/0.1 (pesquisa academica; coleta lenta; "
+              "Joao Vitor Agostinetti Barberino; jv.barberino@gmail.com)")
 
 
 def montar_url(url_base, ano, numero):
@@ -73,7 +75,9 @@ def baixar(url, destino):
             ultimo_erro = f"HTTP {erro.code}"
             if erro.code == 404:
                 break  # não adianta tentar de novo
-        except (urllib.error.URLError, TimeoutError, OSError) as erro:
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as erro:
+            # HTTPException cobre IncompleteRead (transferência cortada), que não
+            # herda de OSError; vira falha do boletim, sem interromper a coleta.
             ultimo_erro = f"{type(erro).__name__}: {erro}"
         if tentativa < TENTATIVAS:
             time.sleep(2 ** tentativa)
