@@ -4,10 +4,14 @@ Este projeto mede a elasticidade-preço da demanda por ingresso no
 Paulistão Série A1, em 389 boletins financeiros oficiais de 2023 a 2026,
 com efeito fixo de partida e de setor.
 
-Quando um setor fica 10% mais caro que os outros setores do mesmo jogo, o
-público dele cai cerca de 4,4%. A elasticidade estimada é -0,468, com
-intervalo de confiança de 95% de -0,883 a -0,053. A demanda é inelástica
-em todo o intervalo.
+Quando um setor fica mais caro que os outros setores do mesmo jogo, o
+ponto estimado indica queda de público, mas a base não distingue esse
+efeito de zero. Na especificação principal, com erro agrupado por jogo e
+por setor, a elasticidade estimada é -0,468, com intervalo de confiança de
+95% de -0,975 a +0,039. O ponto é negativo em 14 de 16 variantes de
+especificação. Nas 4 variantes cujo intervalo exclui zero, o intervalo
+também passa de -1. A base não sustenta afirmar uma elasticidade
+distinguível de zero, nem que a demanda é inelástica.
 
 O número vale para preço relativo entre setores da mesma partida. Esta
 base não mede o efeito de uma alta geral de preço, pelo motivo na
@@ -133,8 +137,14 @@ A especificação principal (E2) é
 
 log(ingressos) = beta x log(preço) + efeito fixo de partida + efeito fixo de setor
 
-com erro padrão agrupado por jogo. O efeito fixo de partida absorve tudo o
-que é comum ao jogo: adversário, data, estádio, momento do campeonato,
+com quantidade sem ponderação e erro padrão agrupado em duas dimensões, jogo
+e setor. O agrupamento duplo é necessário porque a mesma observação
+pertence às duas dimensões: são 337 setores acompanhados ao longo de quatro
+temporadas, e há dependência serial dentro do setor. Agrupar só por jogo
+ignora essa dependência e subestima o erro. A versão original deste
+projeto agrupava só por jogo; ela aparece no resultado, para comparação.
+
+O efeito fixo de partida absorve tudo o que é comum ao jogo: adversário, data, estádio, momento do campeonato,
 nível geral de preço. O efeito fixo de setor absorve o que é permanente no
 setor: localização, conforto, tamanho. Sobra para identificar o beta a
 variação do preço de um setor em relação aos outros setores do mesmo jogo,
@@ -142,7 +152,9 @@ de um jogo para outro.
 
 Antes de qualquer resultado foram declaradas três especificações: E1, só
 com efeito fixo de partida; E2, a principal; E3, E2 em cada temporada. As
-três estão no resultado. A estimação usa `linearmodels.PanelOLS`, e o beta
+três estão no resultado, junto com as variantes de ponderação, definição de
+quantidade e amostra da curva de especificação
+(`referencias/curva_especificacao.csv`), todas com agrupamento duplo. A estimação usa `linearmodels.PanelOLS`, e o beta
 de E2 foi conferido contra uma implementação própria (centralização
 alternada seguida de OLS): os dois coincidem até a precisão de máquina
 (diferença de 3,3 x 10^-16).
@@ -151,48 +163,58 @@ Notebooks: `04_descritiva`, `05_modelo` e `06_receita`, em `notebooks/`.
 
 ## Resultado
 
-### Elasticidade
+### Curva de especificação
 
-| Especificação | beta | Erro padrão | IC 95% | Obs. | Jogos | Setores |
-|---|---|---|---|---|---|---|
-| E1: efeito fixo de partida | -0,769 | 0,113 | [-0,991; -0,547] | 2.212 | 387 | 337 |
-| **E2: partida e setor (principal)** | **-0,468** | **0,212** | **[-0,883; -0,053]** | 2.212 | 387 | 337 |
-| E3: E2 em 2023 | -1,191 | 0,434 | [-2,044; -0,338] | 630 | 109 | 179 |
-| E3: E2 em 2024 | -1,170 | 0,732 | [-2,610; 0,270] | 602 | 104 | 169 |
-| E3: E2 em 2025 | -0,321 | 0,340 | [-0,989; 0,348] | 593 | 103 | 131 |
-| E3: E2 em 2026 | 0,267 | 0,498 | [-0,716; 1,249] | 387 | 71 | 129 |
+![Curva de especificação](figuras/05_modelo/curva_especificacao.png)
 
-Na especificação principal, o beta é -0,468, com IC 95% de -0,883 a
--0,053. O intervalo inteiro fica entre -1 e 0: a demanda de setor é
-inelástica em todo o intervalo, e o intervalo exclui zero por pouco.
-
-Por temporada, o resultado não se distingue de ruído. Só 2023 tem
-intervalo que exclui zero, 2026 tem sinal positivo, e os quatro intervalos
-se sobrepõem.
-
-### Robustez
-
-| Variante de E2 | beta | IC 95% | Obs. | Jogos | Setores |
+| Variante | beta | IC 95% | Obs. | Jogos | Setores |
 |---|---|---|---|---|---|
-| Setores com >= 3 observações | -0,485 | [-0,887; -0,083] | 2.023 | 369 | 186 |
-| Setores com >= 5 observações | -0,529 | [-0,940; -0,117] | 1.895 | 349 | 150 |
-| Sem unidades com ocupação aparente >= 0,90 | -0,811 | [-1,311; -0,312] | 1.765 | 364 | 215 |
+| **E2, quantidade, sem peso (principal)** | **-0,468** | **[-0,975; +0,039]** | 2.212 | 387 | 337 |
+| E2, principal agrupada só por jogo (comparação) | -0,468 | [-0,883; -0,053] | 2.212 | 387 | 337 |
+| E1, só efeito fixo de partida | -0,769 | [-1,259; -0,279] | 2.212 | 387 | 337 |
+| E2, peso exógeno (média de q do setor nos outros jogos) | -0,383 | [-0,858; +0,092] | 2.099 | 377 | 224 |
+| E2, peso = q (endógeno) | +0,114 | [-0,365; +0,594] | 2.212 | 387 | 337 |
+| E2, quantidade = só Inteira | -1,011 | [-1,683; -0,339] | 2.212 | 387 | 337 |
+| E2, unidades com 100+ ingressos | -0,161 | [-0,637; +0,315] | 1.661 | 373 | 306 |
+| E2, unidades com 200+ ingressos | -0,075 | [-0,502; +0,352] | 1.382 | 354 | 283 |
+| E2, setores com >= 3 observações | -0,485 | [-0,976; +0,006] | 2.023 | 369 | 186 |
+| E2, setores com >= 5 observações | -0,529 | [-1,027; -0,030] | 1.895 | 349 | 150 |
+| E2, sem ocupação aparente >= 0,90 | -0,811 | [-1,387; -0,236] | 1.765 | 364 | 215 |
+| E2, sem São Paulo, Palmeiras, Santos e Corinthians | -0,647 | [-1,413; +0,119] | 1.094 | 277 | 182 |
+| E2, só esses quatro | -0,231 | [-0,924; +0,463] | 1.118 | 110 | 155 |
+| E3, E2 em 2023 | -1,191 | [-2,518; +0,136] | 630 | 109 | 179 |
+| E3, E2 em 2024 | -1,170 | [-2,853; +0,513] | 602 | 104 | 169 |
+| E3, E2 em 2025 | -0,321 | [-1,020; +0,379] | 593 | 103 | 131 |
+| E3, E2 em 2026 | +0,267 | [-1,199; +1,732] | 387 | 71 | 129 |
 
-Retirar setores com poucas observações não muda o resultado. Retirar as
-unidades possivelmente esgotadas torna o beta mais negativo, como se espera
-de censura por capacidade, e o intervalo atravessa -1.
+Todas as linhas, menos a de comparação, usam erro agrupado por jogo e
+setor.
 
-Recortes por grupo de mandante:
+**Leitura.** O ponto estimado é negativo em 14 das 16 variantes e, na
+principal e nas variantes de ponderação exógena e de amostra por número de
+observações, fica entre -0,38 e -0,53. Mas com agrupamento duplo a
+principal não exclui zero: o intervalo vai de -0,975 a +0,039. Agrupada só
+por jogo, como na versão original, ela excluía zero por pouco
+([-0,883; -0,053]); a diferença é só o erro.
 
-| Recorte de E2 | beta | Erro padrão | IC 95% | Obs. | Jogos | Setores |
-|---|---|---|---|---|---|---|
-| Completa | -0,468 | 0,212 | [-0,883; -0,053] | 2.212 | 387 | 337 |
-| Sem São Paulo, Palmeiras, Santos e Corinthians | -0,647 | 0,245 | [-1,128; -0,165] | 1.094 | 277 | 182 |
-| Só esses quatro | -0,231 | 0,372 | [-0,960; 0,499] | 1.118 | 110 | 155 |
+Quatro variantes excluem zero: E1, quantidade só Inteira, setores com 5 ou
+mais observações e o filtro de ocupação aparente. Nas quatro, o intervalo
+também passa de -1, então nenhuma delas sustenta inelasticidade. A de
+quantidade só Inteira dá -1,011, perto de elasticidade unitária, o que
+inverte a conclusão de inelasticidade. A base não sustenta afirmar uma
+elasticidade distinguível de zero na especificação principal, nem que a
+demanda é inelástica.
 
-Sem os quatro grandes, o beta fica mais negativo e o intervalo continua
-excluindo zero. Só com eles, o intervalo atravessa zero. Os intervalos dos
-dois grupos se sobrepõem (ver Limitação 5).
+**Ponderação endógena.** Ponderar log(q) por q é ponderar pela própria
+variável dependente, e isso enviesa. Com peso q o ponto vira +0,114
+([-0,365; +0,594]). Com peso exógeno, a média de q do mesmo setor nos
+outros jogos, o sinal não inverte: fica em -0,383 ([-0,858; +0,092]). A
+inversão para +0,114 é em boa parte artefato do peso. O mesmo vale para os
+cortes por tamanho (100+ e 200+ ingressos), que selecionam pela dependente
+e puxam o ponto para -0,161 e -0,075.
+
+**Por temporada**, o resultado não se distingue de ruído: nenhum dos
+quatro intervalos exclui zero, e 2026 tem sinal positivo.
 
 Placebo do filtro de censura: com o preço embaralhado dentro de cada jogo,
 60 vezes (semente 20261013), o beta médio fica em -0,001 sem o filtro de
@@ -201,26 +223,36 @@ ocupação (desvio-padrão de 0,055 entre as repetições) e em +0,001 com ele
 menos que a dispersão de uma repetição para outra. O filtro, sozinho, não
 produz o resultado. Esse desvio-padrão não é medida de incerteza
 alternativa: o embaralhamento destrói a dependência dentro do jogo que o
-erro agrupado contabiliza, e o intervalo que vale é o agrupado.
+erro agrupado contabiliza.
 
 ![Resíduo contra valor ajustado de E2](figuras/05_modelo/residuo_ajustado_E2.png)
 
 ### O que isso implica
 
-Dentro da faixa de preço já praticada, quando um clube encarece um setor
-em relação aos outros setores do mesmo jogo, o público desse setor cai
-menos que proporcionalmente, e a receita de mercado do setor sobe. Com o
-beta de E2, encarecer cada setor em 10% em relação aos demais do jogo
-implica +5,2% na receita de mercado do setor, com faixa de +1,1% a +9,5%
-pelo IC 95%. Aplicado à arrecadação de mercado do boletim nas unidades da
-estimação (R$ 164,2 milhões de 2026), o percentual corresponde a +R$ 8,5
-milhões, com faixa de +R$ 1,8 a +R$ 15,5 milhões.
+A pergunta que a base responde é estreita: o que acontece com a
+arrecadação de mercado de **um** setor quando o preço da Inteira **desse**
+setor sobe em relação aos outros setores do mesmo jogo. Com o coeficiente
+direto de log(arrecadação do setor) em E2, com erro agrupado por jogo e
+setor, uma alta relativa de 10% corresponde a +4,36% na arrecadação de
+mercado do setor, com faixa de -0,69% a +9,67% pelo IC 95%. A faixa
+contém zero.
 
-![Variação da receita do setor com preço relativo alterado](figuras/06_receita/variacao_receita.png)
+O número não pode ser somado sobre os setores do jogo nem multiplicado por
+uma receita agregada. Se todos os setores sobem 10%, nenhum subiu em
+relação aos outros, e esse movimento é exatamente o que o efeito fixo de
+partida absorve.
+
+O coeficiente de receita é estimado diretamente, e não como 1 + beta,
+porque o preço do modelo é o da Inteira e a quantidade soma Meia. O
+repasse da Inteira para o preço médio realizado do setor é 0,916, não 1, e
+a identidade fecha: -0,468 + 0,916 = +0,448, o coeficiente de
+log(arrecadação).
+
+![Variação da arrecadação de um setor com preço relativo alterado](figuras/06_receita/variacao_receita.png)
 
 A evidência para aí. Ela não diz o que acontece numa alta geral de preço,
 não diz qual é o preço ótimo e não diz que algum clube cobra pouco (ver
-Limitações 1, 8 e 10).
+Limitações 1, 2, 9 e 11).
 
 ## Limitações metodológicas conhecidas
 
@@ -236,7 +268,19 @@ endogeneidade que o efeito fixo resolve. O efeito fixo de partida reduz o
 desvio-padrão de log(preço) de 0,663 para 0,359, e o de setor, para 0,101.
 A estimativa vem dessa variação residual pequena.
 
-**2. Endogeneidade residual.** O clube também escolhe o preço de cada
+**2. Fragilidade a escolhas de especificação.** A conclusão depende de
+três escolhas que a versão original não discutia. Nível de agrupamento do
+erro: a principal, -0,468, exclui zero agrupada só por jogo
+([-0,883; -0,053]) e não exclui com agrupamento por jogo e setor
+([-0,975; +0,039]). Ponderação: com peso q o ponto vira +0,114
+([-0,365; +0,594]), com peso exógeno fica em -0,383 ([-0,858; +0,092]).
+Definição de quantidade: com só ingressos Inteira, -1,011
+([-1,683; -0,339]). Cortes por tamanho, que selecionam pela dependente,
+levam o ponto a -0,161 (100+ ingressos) e -0,075 (200+). Das 16 variantes
+com agrupamento duplo, 4 excluem zero, e nas 4 o intervalo também passa de
+-1. A curva completa está em `referencias/curva_especificacao.csv`.
+
+**3. Endogeneidade residual.** O clube também escolhe o preço de cada
 setor. Se ele encarece o setor que espera vender bem naquele jogo, por
 motivo que nem o efeito fixo de partida nem o de setor captura, o beta é
 puxado em direção a zero. A base não tem instrumento para separar isso.
@@ -245,7 +289,7 @@ Sem modelo, preço e público andam juntos entre setores e jogos
 clube grande. Os efeitos fixos removem essa parte, não a escolha de preço
 dentro do jogo.
 
-**3. Censura por capacidade.** Sem laudo técnico de capacidade dos
+**4. Censura por capacidade.** Sem laudo técnico de capacidade dos
 estádios, não se sabe que setor esgotou. Em setor esgotado, o público
 observado é teto, não demanda, e isso puxa o beta para zero. O filtro usado
 é proxy: ocupação aparente é o público do setor no jogo dividido pelo maior
@@ -254,26 +298,28 @@ aparente de 0,90 ou mais leva o beta de -0,468 a -0,811. O máximo
 histórico subestima a capacidade, então o filtro é conservador e não
 resolve a censura.
 
-**4. Parte pequena da base identifica o modelo.** O subconjunto
+**5. Parte pequena da base identifica o modelo.** O subconjunto
 identificador (regime mercado, preço não regulado) são 2.290 das 12.241
 linhas. O regime mercado é 43,4% dos ingressos da base (2.094.600 de
 4.821.229). Sócio é 41,8%, contrato 11,0%, gratuidade 2,0%, não vendido
 1,7% e promocional 0,1%. A elasticidade vale para o público de mercado,
 não para o sócio-torcedor nem para o contrato de longo prazo.
 
-**5. Concentração.** São Paulo, Palmeiras, Santos e Corinthians somam
+**6. Concentração.** São Paulo, Palmeiras, Santos e Corinthians somam
 50,5% das unidades da estimação (1.118 de 2.212 setor-jogos) e 58,0% dos
-ingressos de mercado dessas unidades, em 110 dos 387 jogos. O resultado
-não é puxado por esses quatro clubes. Sem eles, o beta é -0,647, com IC
-95% de -1,128 a -0,165 (1.094 setor-jogos, 277 jogos, 182 setores). Só com
-eles, o beta é -0,231, com IC 95% de -0,960 a +0,499 (1.118 setor-jogos,
-110 jogos, 155 setores), e o intervalo atravessa zero. Os dois intervalos
-se sobrepõem, então não dá para afirmar que os grupos diferem.
+ingressos de mercado dessas unidades, em 110 dos 387 jogos. Com erro
+agrupado por jogo e setor, sem eles o beta é -0,647, com IC 95% de -1,413 a
++0,119 (1.094 setor-jogos, 277 jogos, 182 setores). Só com eles, o beta é
+-0,231, com IC 95% de -0,924 a +0,463 (1.118 setor-jogos, 110 jogos, 155
+setores). Os dois intervalos contêm zero e se sobrepõem, então não dá para
+afirmar que os grupos diferem nem que algum deles tem elasticidade
+distinguível de zero. O ponto mais negativo sem os quatro grandes indica
+que o resultado não é puxado por eles.
 *Hipótese, não testada:* clube grande esgota setor com mais frequência, e
-a censura puxa o beta para zero (Limitação 3), o que explicaria um beta
+a censura puxa o beta para zero (Limitação 4), o que explicaria um beta
 menor em módulo entre os quatro grandes.
 
-**6. Anomalia de composição em 2025.** O público de mercado por jogo cai
+**7. Anomalia de composição em 2025.** O público de mercado por jogo cai
 de 6.043 em 2024 para 3.928 em 2025 e volta a 5.402 em 2026. Ao ritmo de
 2024, faltam 217.870 ingressos de mercado em 2025. A queda atinge 8 dos 14
 mandantes presentes nas duas temporadas, com Santos a -77%, Mirassol a
@@ -283,18 +329,18 @@ mandantes ficam estáveis ou sobem. Rótulos novos de sócio e contrato em
 linhas por boletim em 2024 e 33,3 em 2025). A causa é desconhecida e
 nenhuma correção foi aplicada.
 
-**7. Taxa de conveniência de 10%.** Em parte dos boletins ela aparece como
+**8. Taxa de conveniência de 10%.** Em parte dos boletins ela aparece como
 categoria própria (Meia Social, Solidário, a 1,10 da Meia). Em outros pode
 estar embutida no preço da Inteira. Isso contamina a comparação de nível de
 preço entre clubes (`notebooks/04_descritiva`, gráfico c).
 
-**8. Faixa de preço observada.** A conta de receita só vale dentro da
+**9. Faixa de preço observada.** A conta de receita só vale dentro da
 faixa de preço que cada setor já praticou. Com +20% de preço, 30,0% dos
 setor-jogos saem da faixa do próprio setor; com -20%, 51,3%; com +10%,
 26,3%; com -10%, 42,8%. 142 dos 337 setores praticaram um só preço real em
 toda a base, e para eles qualquer variação é extrapolação.
 
-**9. Dados ausentes e inconsistentes na fonte.** O boletim 2025_57 está
+**10. Dados ausentes e inconsistentes na fonte.** O boletim 2025_57 está
 fora da base: o cabeçalho da tabela sai embaralhado na extração e a linha
 TOTAIS não traz arrecadação, então o jogo não pode ser validado. Os números
 não foram digitados à mão. Em 2024_40 (Inter Limeira x São Paulo), 7 linhas
@@ -302,15 +348,16 @@ rotuladas Gratuidade têm preço de R$ 89 a R$ 219 e somam R$ 212.586. O
 rótulo e o preço se contradizem na fonte, e as linhas ficam em revisão,
 fora de qualquer regime.
 
-**10. Recomendar preço não é entrega deste projeto.** Com beta maior que
--1, a receita de bilheteria cresce sem limite com o preço no modelo de
-elasticidade constante. Isso é consequência da forma funcional, não do
-mundo, e por isso não há preço ótimo a calcular. A conta de receita também
+**11. Recomendar preço não é entrega deste projeto.** Com coeficiente de
+arrecadação positivo e constante, a receita do setor cresce sem limite com
+o preço no modelo. Isso é consequência da forma funcional, não do mundo, e
+por isso não há preço ótimo a calcular. Além disso, o intervalo do
+coeficiente contém zero, e nem o sinal do efeito sobre a receita está
+estabelecido. A conta de receita também
 ignora o que o preço afeta além da bilheteria: consumo dentro do estádio,
 conversão de sócio, formação de torcedor no longo prazo, ambiente de
 estádio cheio e capacidade. O clube pode estar escolhendo o preço atual de
-propósito, por esses motivos. Elasticidade menor que 1 em módulo não prova
-que o clube cobra pouco.
+propósito, por esses motivos.
 
 ## Estrutura do repositório
 
@@ -319,7 +366,7 @@ que o clube cobra pouco.
 | `scripts/01_coleta_boletins.py` | Download dos boletins |
 | `scripts/02_parser_boletim.py` | Parser de um boletim |
 | `scripts/03_lote_boletins.py` | Lote dos 389 boletins e padronização |
-| `referencias/` | Dicionários de categoria, subtipo, clube e estádio; IPCA; razão sobre a Inteira |
+| `referencias/` | Dicionários de categoria, subtipo, clube e estádio; IPCA; razão sobre a Inteira; curva de especificação |
 | `data/03_processed/` | Base processada e dicionário de colunas |
 | `notebooks/` | Descritiva (04), modelo (05) e receita (06) |
 | `figuras/` | Gráficos gerados pelos notebooks |
