@@ -5,6 +5,7 @@ Uso, a partir da raiz do repositório:
 """
 
 import importlib.util
+import sys
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -398,6 +399,63 @@ class TestPadronizacaoNoCSV(unittest.TestCase):
         sem = lote.padronizar(r, self.clubes, self.estadios)
         self.assertEqual(sem, {"clube": {"Clube X"}, "estadio": {"Estádio Y"}})
         self.assertEqual((r[0]["mandante"], r[0]["visitante"], r[0]["estadio"]), ("", "Santos", ""))
+
+
+class TestLoteNaoSobrescreveBaseIncompleta(unittest.TestCase):
+    """Rodar o lote sem os PDFs (ou com poucos) não pode tocar nos arquivos
+    versionados e tem que sair com código diferente de zero."""
+
+    ARQUIVOS = [RAIZ / "data" / "03_processed" / "boletins.csv",
+                RAIZ / "referencias" / "razao_categoria_inteira.csv"]
+
+    def rodar_lote(self, pasta_raw):
+        import hashlib
+        import subprocess
+        antes = {p: hashlib.sha1(p.read_bytes()).hexdigest() for p in self.ARQUIVOS}
+        r = subprocess.run([sys.executable, str(RAIZ / "scripts" / "03_lote_boletins.py"),
+                            "--pasta-raw", str(pasta_raw)],
+                           capture_output=True, text=True, encoding="utf-8")
+        depois = {p: hashlib.sha1(p.read_bytes()).hexdigest() for p in self.ARQUIVOS}
+        self.assertNotEqual(r.returncode, 0, r.stdout[-2000:])
+        self.assertEqual(antes, depois)
+        for p in self.ARQUIVOS:
+            self.assertFalse(p.with_name(p.name + ".tmp").exists())
+        return r
+
+    def test_diretorio_de_pdfs_vazio(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as vazio:
+            r = self.rodar_lote(vazio)
+        self.assertIn("NADA FOI SUBSTITUÍDO", r.stdout)
+
+    def test_poucos_pdfs_presentes(self):
+        import shutil
+        import tempfile
+        with tempfile.TemporaryDirectory() as pasta:
+            for pdf in FIXTURES.glob("*.pdf"):
+                destino = Path(pasta) / pdf.stem[:4]
+                destino.mkdir(exist_ok=True)
+                shutil.copy(pdf, destino / pdf.name)
+            r = self.rodar_lote(pasta)
+        self.assertIn("385 boletins abortados", r.stdout)
+
+
+class TestColeta(unittest.TestCase):
+    def test_transferencia_cortada_vira_falha_sem_interromper(self):
+        import http.client
+        import tempfile
+        from unittest import mock
+        spec = importlib.util.spec_from_file_location(
+            "coleta_boletins", RAIZ / "scripts" / "01_coleta_boletins.py")
+        coleta = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(coleta)
+        with tempfile.TemporaryDirectory() as pasta,                 mock.patch.object(coleta.urllib.request, "urlopen",
+                                  side_effect=http.client.IncompleteRead(b"parcial", 100)),                 mock.patch.object(coleta.time, "sleep"):
+            destino = Path(pasta) / "2026_1.pdf"
+            erro = coleta.baixar("https://exemplo.invalid/1.pdf", destino)
+            self.assertIn("IncompleteRead", erro)
+            self.assertFalse(destino.exists())
+            self.assertFalse(destino.with_suffix(".part").exists())
 
 
 if __name__ == "__main__":
