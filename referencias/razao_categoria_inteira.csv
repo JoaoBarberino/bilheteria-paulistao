@@ -1,11 +1,13 @@
-categoria,observacoes,ingressos,pct_exatamente_metade,razao_mediana,razao_minima,razao_maxima,observacoes_sobre_meia,razao_meia_mediana,razao_meia_minima,razao_meia_maxima
-Inteira,2335,898596,0.0,1.0000,1.0000,1.0000,2126,2.0000,1.9999,2.0000
-Meia,2126,1085246,100.0,0.5000,0.5000,0.5000,2462,1.0000,1.0000,1.0000
-Meia Promocional,54,13916,100.0,0.5000,0.5000,0.5000,65,1.0000,1.0000,1.0000
-PCR,31,290,96.8,0.5000,0.5000,1.0000,24,1.0000,1.0000,2.0000
-Acompanhante,16,1019,0.0,1.0000,1.0000,1.0000,0,,,
-Meia Social,10,16870,0.0,0.5503,0.2462,0.5633,10,1.1006,0.4925,1.1266
-Solidário,10,4155,0.0,0.5506,0.5505,0.5506,10,1.1013,1.1009,1.1013
-Meia Solidária,3,1781,0.0,0.5546,0.5505,0.8283,1,1.1092,1.1092,1.1092
-Menor,1,1201,100.0,0.5000,0.5000,0.5000,0,,,
-Meia legal,1,368,100.0,0.5000,0.5000,0.5000,1,1.0000,1.0000,1.0000
+categoria,situacao,observacoes,ingressos,pct_exatamente_metade,razao_mediana,razao_minima,razao_maxima,observacoes_sobre_meia,razao_meia_mediana,razao_meia_minima,razao_meia_maxima
+Meia,mercado,2140,1087340,99.9,0.5000,0.3333,0.5000,0,,,
+Meia,contrato,20,2211,15.0,0.2500,0.2258,0.5000,0,,,
+Meia,revisão,6,2693,0.0,0.4372,0.2236,0.8405,0,,,
+Meia Promocional,mercado,54,13916,100.0,0.5000,0.5000,0.5000,65,1.0000,1.0000,1.0000
+PCR,mercado,31,290,96.8,0.5000,0.5000,1.0000,24,1.0000,1.0000,2.0000
+Acompanhante,mercado,16,1019,0.0,1.0000,1.0000,1.0000,2,0.8571,0.8571,0.8571
+Meia Social,mercado,10,16870,0.0,0.5503,0.2462,0.5633,10,1.1006,0.4925,1.1266
+Solidário,mercado,10,4155,0.0,0.5506,0.5505,0.5506,10,1.1013,1.1009,1.1013
+Meia Solidária,mercado,3,1781,0.0,0.5546,0.5505,0.8283,1,1.1092,1.1092,1.1092
+Meia legal,mercado,1,368,100.0,0.5000,0.5000,0.5000,1,1.0000,1.0000,1.0000
+Meia legal,gratuidade,1,7,0.0,0.0000,0.0000,0.0000,1,0.0000,0.0000,0.0000
+Menor,mercado,2,1502,50.0,0.7500,0.5000,1.0000,2,1.5000,1.0000,2.0000
